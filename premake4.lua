@@ -1,4 +1,4 @@
-solution "WER"
+solution "Game"
 
       -- Red Game --------------------------------------------------------------
 
@@ -15,11 +15,11 @@ solution "WER"
         defines       { "NDEBUG", "_CRT_SECURE_NO_WARNINGS", "_WINSOCK_DEPRECATED_NO_WARNINGS" }
         flags         { "Optimize" }
 
-      project "WERWindows"
+      project "Game"
           kind            "ConsoleApp"
           language        "C++"
           flags           { "FatalWarnings", "NoExceptions", "NoRTTI" }
-           defines        { "RETRO_WIN" }
+          defines         { }
           links           { "SDL2", "SDL2main"}
           includedirs     { "ref/SDL2/include", "ref/" }
           libdirs         { "ref/SDL2/lib/x86/" }
