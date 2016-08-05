@@ -1,0 +1,14 @@
+*.exe
+*.dll
+*.sln
+*.vcxproj
+*.filters
+*.user
+*.res
+
+.vs
+ref/SDL2/
+bin/
+obj/
+
+genie.exe

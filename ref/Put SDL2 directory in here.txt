@@ -1,0 +1,9 @@
+Copy the SDL2 directory into here.
+
+See:
+
+https://www.libsdl.org/download-2.0.php
+
+Development Libraries Section
+
+    SDL2-devel-2.x.y-VC.zip 
