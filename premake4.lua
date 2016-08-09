@@ -24,7 +24,7 @@ solution "Game"
           includedirs     { "ref/SDL2/include", "ref/" }
           libdirs         { "ref/SDL2/lib/x86/" }
           
-          files           { "retro.c", "retro.h", "*.c", "*.h", "resources.rc", "*.png", "*.ogg" }
+          files           { "retro.c", "retro.h", "*.c", "*.h", "resources.rc", "assets/*.png", "assets/*.ogg" }
           excludes        { "retro.c" }
 
       --------------------------------------------------------------------------
