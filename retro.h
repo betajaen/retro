@@ -2,7 +2,11 @@
 #define RETRO_H
 
 #ifdef _WIN32
-#define RETRO_WIN
+#define RETRO_WINDOWS
+#endif
+
+#ifdef __EMSCRIPTEN__
+#define RETRO_BROWSER
 #endif
 
 #define Kilobytes(N) ((N) * 1024)
@@ -34,7 +38,6 @@
 
 #ifndef RETRO_ARENA_SIZE
 #define RETRO_ARENA_SIZE 512
-//Megabytes(1)
 #endif
 
 #ifndef RETRO_ARENA_STACK_SIZE

@@ -3,16 +3,19 @@
 
 #include "retro.h"
 
-#ifdef RETRO_WIN
+#ifdef RETRO_WINDOWS
 #   include "windows.h"
 #endif
 
 #define LODEPNG_NO_COMPILE_ENCODER
-#include "lodepng.c"
+#include "ref/lodepng.c"
 #include "SDL.h"
 #include "SDL_main.h"
 #include "assert.h"
 
+#ifdef RETRO_BROWSER
+#include <emscripten.h>
+#endif
 
 Colour kDefaultPalette[] = {
   { 0xFF, 0x00, 0xFF },
@@ -88,6 +91,7 @@ U32                 gScopeStackIndex;
 char                gInputChar;
 InputCharState      gInputCharState;
 InputActionBinding  gInputActions[RETRO_MAX_INPUT_ACTIONS];
+bool                gQuit;
 
 typedef union
 {
@@ -97,8 +101,8 @@ typedef union
 } RetroFourByteUnion;
 
 #define RETRO_SDL_DRAW_PUSH_RGB(T, RGB) \
-  SDL_Color T; \
-  SDL_GetRenderDrawColor(gRenderer, &T.r, &T.g, &T.b, &T.a); \
+  SDL_Color T; U8 TAlpha;\
+  SDL_GetRenderDrawColor(gRenderer, &T.r, &T.g, &T.b, &TAlpha); \
   SDL_SetRenderDrawColor(gRenderer, RGB.r, RGB.g, RGB.b, 0xFF);
 
 #define RETRO_SDL_DRAW_POP_RGB(T) \
@@ -118,9 +122,23 @@ typedef union
   DST.w = SRC.right - SRC.left;\
   DST.h = SRC.bottom - SRC.top;
 
+#ifdef RETRO_BROWSER
+
+char gTempBrowserPath[256];
+
+#define RETRO_BROWSER_PATH ((const char*) (gTempBrowserPath))
+
+#define RETRO_MAKE_BROWSER_PATH(N) \
+  gTempBrowserPath[0] = 0; \
+  strcat(gTempBrowserPath, "assets/"); \
+  strcat(gTempBrowserPath, name)
+
+#endif
+
+
 void* Resource_Load(const char* name, U32* outSize)
 {
-#ifdef RETRO_WIN
+#ifdef RETRO_WINDOWS
   assert(outSize);
 
   HRSRC handle = FindResource(0, name, "RESOURCE");
@@ -139,21 +157,35 @@ void* Resource_Load(const char* name, U32* outSize)
 
   return ptr;
 #else
-  UNUSED(name);
-  UNUSED(outSize);
+  RETRO_UNUSED(name);
+  RETRO_UNUSED(outSize);
   return NULL;
 #endif
 }
 
+
 void  Palette_LoadFromBitmap(const char* name, Palette* palette)
 {
-  U32 resourceSize = 0;
   U32 width, height;
-  void* resourceData = Resource_Load(name, &resourceSize);
 
-  U8* imageData;
-  lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
-  
+  U8* imageData = NULL;
+
+  char n[256];
+  n[0] = 0;
+  strcat(&n[0], "assets/");
+  strcat(&n[0], name);
+
+  #if defined(RETRO_WINDOWS)
+    U32 resourceSize = 0;
+    void* resourceData = Resource_Load(name, &resourceSize);
+    lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
+  #elif defined(RETRO_BROWSER)
+    RETRO_MAKE_BROWSER_PATH(name);
+    lodepng_decode_file(&imageData, &width, &height, RETRO_BROWSER_PATH, LCT_RGB, 8);
+  #endif
+
+  assert(imageData);
+
   //Colour lastColour = Colour_Make(0xCA, 0xFE, 0xBE);
   
   for(U32 i=0;i < width * height * 3;i+=3)
@@ -174,12 +206,18 @@ void  Palette_LoadFromBitmap(const char* name, Palette* palette)
 
 void Bitmap_Load(const char* name, Bitmap* outBitmap, U8 colourOffset)
 {
-  U32 resourceSize = 0;
   U32 width, height;
-  void* resourceData = Resource_Load(name, &resourceSize);
 
-  U8* imageData;
-  lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_PALETTE, 8);
+  U8* imageData = NULL;
+
+#ifdef RETRO_WINDOWS
+  U32 resourceSize = 0;
+  void* resourceData = Resource_Load(name, &resourceSize);
+  lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
+#elif defined(RETRO_BROWSER)
+  RETRO_MAKE_BROWSER_PATH(name);
+  lodepng_decode_file(&imageData, &width, &height, RETRO_BROWSER_PATH, LCT_RGB, 8);
+#endif
 
   assert(imageData);
   
@@ -234,7 +272,9 @@ void Canvas_SetSize(Size size)
 
   if (gRenderer != NULL)
   {
+  #ifdef RETRO_WINDOWS
     SDL_RenderSetLogicalSize(gRenderer, gCanvasSize.w, gCanvasSize.h);
+  #endif
   }
 }
 
@@ -302,7 +342,7 @@ void  Palette_Make(Palette* palette)
 void  Palette_Add(Palette* palette, Colour colour)
 {
   assert(palette);
-  assert(palette->count < 256);
+  assert(palette->count <= 255);
   palette->colours[palette->count] = colour;
   ++palette->count;
 }
@@ -609,12 +649,18 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
   RETRO_UNUSED(markerColour);
   RETRO_UNUSED(transparentColour);
 
-  U32 resourceSize = 0;
   U32 width, height;
-  void* resourceData = Resource_Load(name, &resourceSize);
 
-  U8* imageData;
+  U8* imageData = NULL;
+
+#ifdef RETRO_WINDOWS
+  U32 resourceSize = 0;
+  void* resourceData = Resource_Load(name, &resourceSize);
   lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
+#elif defined(RETRO_BROWSER)
+  RETRO_MAKE_BROWSER_PATH(name);
+  lodepng_decode_file(&imageData, &width, &height, RETRO_BROWSER_PATH, LCT_RGB, 8);
+#endif
 
   assert(imageData);
 
@@ -842,8 +888,72 @@ void Restart()
   Start();
 }
 
-#ifdef RETRO_WIN
+void Frame()
+{
+  SDL_Event event;
+  gInputCharState = ICS_None;
+
+  while (SDL_PollEvent(&event))
+  {
+    switch(event.type)
+    {
+      case SDL_QUIT:
+      {
+        gQuit = true;
+      }
+      break;
+      case SDL_TEXTINPUT:
+      {
+        gInputChar = event.text.text[0];
+        gInputCharState = ICS_Character;
+      }
+      break;
+      case SDL_KEYDOWN:
+      {
+
+        if (event.key.keysym.sym == SDLK_BACKSPACE)
+        {
+          gInputCharState = ICS_Backspace;
+        }
+        else if (event.key.keysym.sym == SDLK_RETURN)
+        {
+          gInputCharState = ICS_Enter;
+        }
+      }
+      break;
+    }
+  }
+
+  const Uint8 *state = SDL_GetKeyboardState(NULL);
+
+  for (U32 i=0;i < RETRO_MAX_INPUT_ACTIONS;i++)
+  {
+    InputActionBinding* binding = &gInputActions[i];
+    if (binding->action == 0)
+      break;
+
+    binding->lastState = binding->state;
+
+    for (U32 j=0; j < RETRO_MAX_INPUT_BINDINGS;j++)
+    {
+      // binding->action[j];
+
+    }
+
+  }
+
+  Canvas_Clear();
+  Step();
+  Canvas_Flip();
+
+}
+
+
+#ifdef RETRO_WINDOWS
 int main(int argc, char *argv[])
+#endif
+#ifdef RETRO_BROWSER
+int main(int argc, char **argv)
 #endif
 {
 
@@ -882,69 +992,24 @@ int main(int argc, char *argv[])
 
   Canvas_SetSize(Size_Make(RETRO_CANVAS_DEFAULT_WIDTH, RETRO_CANVAS_DEFAULT_HEIGHT));
 
-  bool quit = false;
+  gQuit = false;
 
   Restart();
 
-  while(quit == false)
+  #ifdef RETRO_WINDOWS
+
+  while(gQuit == false)
   {
-    SDL_Event event;
-    gInputCharState = ICS_None;
-
-    while (SDL_PollEvent(&event))
-    {
-      switch(event.type)
-      {
-        case SDL_QUIT:
-        {
-          quit = true;
-        }
-        break;
-        case SDL_TEXTINPUT:
-        {
-          gInputChar = event.text.text[0];
-          gInputCharState = ICS_Character;
-        }
-        break;
-        case SDL_KEYDOWN:
-        {
-
-          if (event.key.keysym.sym == SDLK_BACKSPACE)
-          {
-            gInputCharState = ICS_Backspace;
-          }
-          else if (event.key.keysym.sym == SDLK_RETURN)
-          {
-            gInputCharState = ICS_Enter;
-          }
-        }
-        break;
-      }
-    }
-
-    const Uint8 *state = SDL_GetKeyboardState(NULL);
-
-    for (U32 i=0;i < RETRO_MAX_INPUT_ACTIONS;i++)
-    {
-      InputActionBinding* binding = &gInputActions[i];
-      if (binding->action == 0)
-        break;
-
-      binding->lastState = binding->state;
-
-      for (U32 j=0; j < RETRO_MAX_INPUT_BINDINGS;j++)
-      {
-        // binding->action[j];
-
-      }
-
-    }
-
-    Canvas_Clear();
-    Step();
-    Canvas_Flip();
-
+    Frame();
   }
+
+  #endif
+
+  #ifdef RETRO_BROWSER
+
+  emscripten_set_main_loop(Frame, 0, 0);
+
+  #endif
 
   free(gArena.begin);
   SDL_Quit();

@@ -1,2 +1,2 @@
-palette.png RESOURCE "palette.png"
-NeoSans.png RESOURCE "NeoSans.png"
+palette.png RESOURCE "assets/palette.png"
+NeoSans.png RESOURCE "assets/NeoSans.png"
