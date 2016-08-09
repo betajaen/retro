@@ -36,6 +36,10 @@
 #define RETRO_SOUND_DEFAULT_VOLUME 1.0
 #endif
 
+#ifndef RETRO_FRAME_RATE
+#define RETRO_FRAME_RATE 30
+#endif
+
 #ifndef RETRO_ARENA_SIZE
 #define RETRO_ARENA_SIZE 512
 #endif
@@ -120,6 +124,12 @@ typedef struct
   F32     soundVolume;
   Palette palette;
 } Settings;
+
+typedef struct
+{
+  U32    start, paused;
+  U8     flags;
+} Timer;
 
 #define Point_Translate(P, X_VALUE, Y_VALUE) \
   (P)->x += X_VALUE; \
@@ -223,15 +233,31 @@ void  Input_BindKey(int key, int action);
 
 void  Input_BindAxis(int axis, int action);
 
-bool  Input_ActionDown(int action);
+bool  Input_GetActionDown(int action);
 
-bool  Input_ActionReleased(int action);
+bool  Input_GetActionReleased(int action);
 
-bool  Input_ActionPressed(int action);
+bool  Input_GetActionPressed(int action);
 
-S16   Input_ActionNowAxis(int action);
+S16   Input_GetActionNowAxis(int action);
 
-S16   Input_ActionDeltaAxis(int action);
+S16   Input_GetActionDeltaAxis(int action);
+
+void  Timer_Make(Timer* timer);
+
+void  Timer_Start(Timer* timer);
+
+void  Timer_Stop(Timer* timer);
+
+void  Timer_Pause(Timer* timer);
+
+void  Timer_Unpause(Timer* timer);
+
+U32   Timer_GetTicks(Timer* timer);
+
+bool  Timer_IsStarted(Timer* timer);
+
+bool  Timer_IsPaused(Timer* timer);
 
 void  Init(Settings* s);
 

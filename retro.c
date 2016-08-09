@@ -92,6 +92,9 @@ char                gInputChar;
 InputCharState      gInputCharState;
 InputActionBinding  gInputActions[RETRO_MAX_INPUT_ACTIONS];
 bool                gQuit;
+Timer               gFpsTimer, gCapTimer;
+U32                 gCountedFrames;
+float               gFps;
 
 typedef union
 {
@@ -272,9 +275,7 @@ void Canvas_SetSize(Size size)
 
   if (gRenderer != NULL)
   {
-  #ifdef RETRO_WINDOWS
     SDL_RenderSetLogicalSize(gRenderer, gCanvasSize.w, gCanvasSize.h);
-  #endif
   }
 }
 
@@ -629,7 +630,7 @@ void  Canvas_Debug(Font* font)
   RetroFourByteUnion f;
   f.q = Scope_GetName();
 
-  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%%", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize());
+  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps);
 }
 
 void  Font_Make(Font* font)
@@ -783,7 +784,7 @@ InputActionBinding* Input_MakeAction(int action)
   for(int i=0;i < RETRO_MAX_INPUT_ACTIONS;++i)
   {
     InputActionBinding* binding = &gInputActions[i];
-    if (binding->action == 0)
+    if (binding->action == 0xDEADBEEF)
     {
       binding->action = action;
       return binding;
@@ -836,7 +837,7 @@ void  Input_BindAxis(int axis, int action)
   assert(true); // To many keys to bound
 }
 
-bool  Input_ActionDown(int action)
+bool  Input_GetActionDown(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -844,7 +845,7 @@ bool  Input_ActionDown(int action)
   return binding->state == 1;
 }
 
-bool  Input_ActionReleased(int action)
+bool  Input_GetActionReleased(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -852,7 +853,7 @@ bool  Input_ActionReleased(int action)
   return binding->state == 0 && binding->lastState == 1;
 }
 
-bool  Input_ActionPressed(int action)
+bool  Input_GetActionPressed(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -860,7 +861,7 @@ bool  Input_ActionPressed(int action)
   return binding->state == 1 && binding->lastState == 0;
 }
 
-S16   Input_ActionNowAxis(int action)
+S16   Input_GetActionNowAxis(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -868,12 +869,99 @@ S16   Input_ActionNowAxis(int action)
   return binding->state;
 }
 
-S16   Input_ActionDeltaAxis(int action)
+S16   Input_GetActionDeltaAxis(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
 
   return binding->state - binding->lastState;
+}
+
+typedef enum
+{
+  TF_None    = 0,
+  TF_Started = 1,
+  TF_Paused  = 2
+} Retro_TimerFlags;
+
+void  Timer_Make(Timer* timer)
+{
+  assert(timer);
+  timer->start = 0;
+  timer->paused = 0;
+  timer->flags = TF_None;
+}
+
+void  Timer_Start(Timer* timer)
+{
+  assert(timer);
+  timer->flags = TF_Started;
+  timer->start = SDL_GetTicks();
+  timer->paused = 0;
+}
+
+void  Timer_Stop(Timer* timer)
+{
+  assert(timer);
+
+  timer->start = 0;
+  timer->paused = 0;
+  timer->flags = TF_None;
+}
+
+void  Timer_Pause(Timer* timer)
+{
+  assert(timer);
+
+  if (timer->flags == TF_Started)
+  {
+    timer->flags |= TF_Paused;
+    timer->paused = SDL_GetTicks() - timer->start;
+    timer->start = 0;
+  }
+}
+
+void  Timer_Unpause(Timer* timer)
+{
+  assert(timer);
+
+  if (timer->flags == 3 /* Started | Paused */)
+  {
+    timer->flags = TF_Started; // &= ~Paused
+    timer->start = SDL_GetTicks() - timer->paused;
+    timer->paused = 0;
+  }
+}
+
+U32   Timer_GetTicks(Timer* timer)
+{
+  assert(timer);
+
+  U32 time = 0;
+
+  if (timer->flags != 0) // Started || Paused
+  {
+    if (timer->flags > TF_Started) // Paused
+    {
+      time = timer->paused;
+    }
+    else
+    {
+      time = SDL_GetTicks() - timer->start;
+    }
+  }
+
+  return time;
+}
+
+bool  Timer_IsStarted(Timer* timer)
+{
+  return timer->flags >= TF_Started;
+}
+
+bool  Timer_IsPaused(Timer* timer)
+{
+  return timer->flags >= TF_Paused;
 }
 
 void Restart()
@@ -890,6 +978,8 @@ void Restart()
 
 void Frame()
 {
+  Timer_Start(&gCapTimer);
+
   SDL_Event event;
   gInputCharState = ICS_None;
 
@@ -924,27 +1014,40 @@ void Frame()
     }
   }
 
+  gFps = gCountedFrames / (Timer_GetTicks(&gFpsTimer) / 1000.0f);
+  if (gFps > 200000.0f)
+  {
+    gFps = 0.0f;
+  }
+
   const Uint8 *state = SDL_GetKeyboardState(NULL);
 
   for (U32 i=0;i < RETRO_MAX_INPUT_ACTIONS;i++)
   {
     InputActionBinding* binding = &gInputActions[i];
-    if (binding->action == 0)
+    if (binding->action == 0xDEADBEEF)
       break;
 
     binding->lastState = binding->state;
+    binding->state = 0;
 
     for (U32 j=0; j < RETRO_MAX_INPUT_BINDINGS;j++)
     {
-      // binding->action[j];
+      int key = binding->keys[j];
 
+      if (key == SDL_SCANCODE_UNKNOWN || key >= SDL_NUM_SCANCODES)
+        break;
+
+      binding->state |= (state[key] != 0) ? 1 : 0;
     }
 
+    // @TODO Axis
   }
 
   Canvas_Clear();
   Step();
   Canvas_Flip();
+  ++gCountedFrames;
 
 }
 
@@ -968,6 +1071,11 @@ int main(int argc, char **argv)
   gFmtScratch = malloc(1024);
 
   memset(gInputActions, 0, sizeof(gInputActions));
+
+  for(int i=0;i < RETRO_MAX_INPUT_ACTIONS;++i)
+  {
+    gInputActions[i].action = 0xDEADBEEF;
+  }
 
   gSettings.windowWidth = RETRO_WINDOW_DEFAULT_WIDTH;
   gSettings.windowHeight = RETRO_WINDOW_DEFAULT_HEIGHT;
@@ -996,18 +1104,27 @@ int main(int argc, char **argv)
 
   Restart();
 
+  gCountedFrames = 0;
+  Timer_Start(&gFpsTimer);
+
   #ifdef RETRO_WINDOWS
 
   while(gQuit == false)
   {
     Frame();
+
+    float frameTicks = Timer_GetTicks(&gCapTimer);
+    if (frameTicks < (1000.0f / RETRO_FRAME_RATE))
+    {
+      SDL_Delay((1000.0f / RETRO_FRAME_RATE) - frameTicks);
+    }
   }
 
   #endif
 
   #ifdef RETRO_BROWSER
 
-  emscripten_set_main_loop(Frame, 0, 0);
+  emscripten_set_main_loop(Frame, RETRO_FRAME_RATE, 1);
 
   #endif
 

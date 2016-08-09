@@ -37,10 +37,20 @@ void Start()
 {
 }
 
-int counter = 0;
+int x = 20, y = 20;
 
 void Step()
 {
-  Canvas_PrintF(20, 20, &neoSans, 2, "Hello World %i", counter++);
+  if (Input_GetActionDown(AC_UP))
+    y--;
+  else if (Input_GetActionDown(AC_DOWN))
+    y++;
+
+  if (Input_GetActionDown(AC_LEFT))
+    x--;
+  else if (Input_GetActionDown(AC_RIGHT))
+    x++;
+
+  Canvas_PrintF(x, y, &neoSans, 2, "Hello World");
   Canvas_Debug(&neoSans);
 }
