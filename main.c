@@ -2,7 +2,9 @@
 
 #include "retro.c"
 
-static Font neoSans;
+static Font   FONT_NEOSANS;
+static Bitmap SPRITESHEET;
+static Sprite SPRITE_TEST;
 
 typedef enum 
 {
@@ -30,7 +32,9 @@ void Init(Settings* settings)
   Input_BindKey(SDL_SCANCODE_RETURN, AC_ACTION);
   Input_BindKey(SDL_SCANCODE_ESCAPE, AC_CANCEL);
 
-  Font_Load("NeoSans.png", &neoSans, Colour_Make(0,0,255), Colour_Make(255,0,255));
+  Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
+  Bitmap_Load("cave.png", &SPRITESHEET);
+
 }
 
 void Start()
@@ -51,6 +55,8 @@ void Step()
   else if (Input_GetActionDown(AC_RIGHT))
     x++;
 
-  Canvas_PrintF(x, y, &neoSans, 2, "Hello World");
-  Canvas_Debug(&neoSans);
+
+  Canvas_Splat(&SPRITESHEET, 0, 0, NULL);
+  Canvas_PrintF(x, y, &FONT_NEOSANS, 2, "Hello World");
+  Canvas_Debug(&FONT_NEOSANS);
 }

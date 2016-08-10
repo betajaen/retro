@@ -9,7 +9,6 @@
 
 #define LODEPNG_NO_COMPILE_ENCODER
 #include "ref/lodepng.c"
-#include "SDL.h"
 #include "SDL_main.h"
 #include "assert.h"
 
@@ -207,7 +206,7 @@ void  Palette_LoadFromBitmap(const char* name, Palette* palette)
 }
 
 
-void Bitmap_Load(const char* name, Bitmap* outBitmap, U8 colourOffset)
+void Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset)
 {
   U32 width, height;
 
@@ -247,6 +246,90 @@ void Bitmap_Load(const char* name, Bitmap* outBitmap, U8 colourOffset)
   outBitmap->h = height;
   outBitmap->handle = texture;
   outBitmap->imageData = imageData;
+}
+
+void Bitmap_Load(const char* name, Bitmap* outBitmap)
+{
+  U32 width, height;
+
+  U8* imageData = NULL;
+
+#ifdef RETRO_WINDOWS
+  U32 resourceSize = 0;
+  void* resourceData = Resource_Load(name, &resourceSize);
+  lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
+#elif defined(RETRO_BROWSER)
+  RETRO_MAKE_BROWSER_PATH(name);
+  lodepng_decode_file(&imageData, &width, &height, RETRO_BROWSER_PATH, LCT_RGB, 8);
+#endif
+
+  assert(imageData);
+
+  SDL_Texture* texture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
+
+  void* pixelsVoid;
+  int pitch;
+  SDL_LockTexture(texture, NULL, &pixelsVoid, &pitch);
+  U8* pixels = (U8*) pixelsVoid;
+
+  Palette* palette = &gSettings.palette;
+  
+  for(U32 i=0;i < (width * height * 3);i+=3)
+  {
+    Colour col;
+    col.r = imageData[i+0];
+    col.g = imageData[i+1];
+    col.b = imageData[i+2];
+
+    int bestIndex = 0x100;
+    int bestDistance = 10000000;
+
+    // Match nearest colour by using a treating the two colours as vectors, and matching against the closest distance between the two.
+    for (U32 j=0;j < palette->count;j++)
+    {
+      Colour pal = palette->colours[j];
+
+      int distance = ((col.r - pal.r) * (col.r - pal.r)) + 
+                     ((col.g - pal.g) * (col.g - pal.g)) + 
+                     ((col.b - pal.b) * (col.b - pal.b));
+      
+      if (distance < bestDistance)
+      {
+        bestDistance = distance;
+        bestIndex = j;
+      }
+
+    }
+
+    if (bestIndex == 0x100)
+    {
+      bestIndex = palette->fallback;
+    }
+
+    Colour bestColour = palette->colours[bestIndex];
+
+    pixels[i+0] = bestColour.r; 
+    pixels[i+1] = bestColour.g;
+    pixels[i+2] = bestColour.b;
+
+  }
+
+  SDL_UnlockTexture(texture);
+
+  outBitmap->w = width;
+  outBitmap->h = height;
+  outBitmap->handle = texture;
+  outBitmap->imageData = imageData;
+}
+
+void Sprite_Make(Sprite* inSprite, Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h)
+{
+  assert(bitmap);
+  inSprite->bitmap = bitmap;
+  inSprite->rect.x = x;
+  inSprite->rect.y = y;
+  inSprite->rect.w = w;
+  inSprite->rect.h = h;
 }
 
 void  Screen_SetSize(Size size)
@@ -320,6 +403,59 @@ void Canvas_Splat(Bitmap* bitmap, U32 x, U32 y, Rect* srcRectangle)
   dst.h = src.h;
 
   SDL_RenderCopy(gRenderer, texture, &src, &dst);
+}
+
+void  Canvas_Splat2(Bitmap* bitmap, U32 x, U32 y, SDL_Rect* srcRectangle)
+{
+  assert(srcRectangle);
+
+  SDL_Rect dst;
+  SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
+
+  dst.x = x;
+  dst.y = y;
+  dst.w = srcRectangle->w;
+  dst.h = srcRectangle->h;
+
+  SDL_RenderCopy(gRenderer, texture, srcRectangle, &dst);
+}
+
+void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle)
+{
+  assert(srcRectangle);
+
+  SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
+  SDL_RenderCopy(gRenderer, texture, srcRectangle, dstRectangle);
+}
+
+void Canvas_Place(Sprite* sprite, U32 x, U32 y)
+{
+  assert(sprite);
+  Canvas_Splat2(sprite->bitmap, x, y, &sprite->rect);
+}
+
+void Canvas_PlaceScaled(Sprite* sprite, U32 x, U32 y, U32 scale)
+{
+  assert(sprite);
+  SDL_Rect dst;
+  dst.x = x;
+  dst.y = y;
+  dst.w = sprite->rect.w * scale;
+  dst.h = sprite->rect.h * scale;
+
+  Canvas_Splat3(sprite->bitmap, &dst, &sprite->rect);
+}
+
+void Canvas_PlaceScaledF(Sprite* sprite, U32 x, U32 y, float scale)
+{
+  assert(sprite);
+  SDL_Rect dst;
+  dst.x = x;
+  dst.y = y;
+  dst.w = sprite->rect.w * scale;
+  dst.h = sprite->rect.h * scale;
+
+  Canvas_Splat3(sprite->bitmap, &dst, &sprite->rect);
 }
 
 void Canvas_Flip()

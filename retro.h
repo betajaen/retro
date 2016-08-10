@@ -62,6 +62,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "SDL.h"
+
 typedef uint8_t  U8;
 typedef uint16_t U16;
 typedef uint32_t U32;
@@ -95,6 +97,12 @@ typedef struct
 {
   S32 left, top, right, bottom;
 } Rect;
+
+typedef struct
+{
+  Bitmap*  bitmap;
+  SDL_Rect rect;
+} Sprite;
 
 typedef struct
 {
@@ -176,7 +184,14 @@ Colour Colour_Make(U8 r, U8 g, U8 b);
 
 void* Resource_Load(const char* name, U32* outSize);
 
-void  Bitmap_Load(const char* name, Bitmap* outBitmap, U8 colourOffset);
+// Loads a bitmap and matches the palette to the canvas palette best it can.
+void  Bitmap_Load(const char* name, Bitmap* outBitmap);
+
+// Loads a bitmap with the palette order matching exactly the canvas palette.
+// Offset is given to offset the loaded order by N colours
+void  Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset);
+
+void  Sprite_Make(Sprite* inSprite, Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
 
 void  Screen_SetSize(Size size);
 
@@ -191,6 +206,16 @@ U32   Canvas_GetWidth();
 U32   Canvas_GetHeight();
 
 void  Canvas_Splat(Bitmap* bitmap, U32 x, U32 y, Rect* srcRectangle);
+
+void  Canvas_Splat2(Bitmap* bitmap, U32 x, U32 y, SDL_Rect* srcRectangle);
+
+void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle);
+
+void  Canvas_Place(Sprite* sprite, U32 x, U32 y);
+
+void  Canvas_PlaceScaled(Sprite* sprite, U32 x, U32 y, U32 scale);
+
+void  Canvas_PlaceScaledF(Sprite* sprite, U32 x, U32 y, float scale);
 
 void  Canvas_Flip();
 
@@ -227,7 +252,7 @@ void  Font_Make(Font* font);
 
 void  Font_Load(const char* name, Font* font, Colour markerColour, Colour transparentColour);
 
-int  Input_TextInput(char* str, U32 capacity);
+int   Input_TextInput(char* str, U32 capacity);
 
 void  Input_BindKey(int key, int action);
 
