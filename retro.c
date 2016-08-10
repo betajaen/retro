@@ -889,6 +889,19 @@ void AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* inAnimatedSpriteOb
 
 }
 
+void AnimatedSpriteObject_SwitchAnimation(AnimatedSpriteObject* animatedSpriteObject, Animation* newAnimation, bool animate)
+{
+  assert(animatedSpriteObject);
+  assert(newAnimation);
+
+  animatedSpriteObject->animation = newAnimation;
+  if (animate)
+    animatedSpriteObject->flags |= SOF_Animation;
+  else
+    animatedSpriteObject->flags &= ~SOF_Animation;
+  animatedSpriteObject->frameNumber = 0;
+}
+
 void  Canvas_Debug(Font* font)
 {
   assert(font);

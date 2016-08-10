@@ -86,6 +86,11 @@ void Step()
 
   player.x += playerVelocity.x;
 
+  if (playerVelocity.x > 0)
+    player.flags &= ~SOF_FlipX;
+  else if (playerVelocity.x < 0)
+    player.flags |= SOF_FlipX;
+
   if (player.x < 0)
   {
     player.x = 0;
@@ -97,10 +102,20 @@ void Step()
     playerVelocity.x = 0;
   }
 
-  if (playerVelocity.x >= 0)
-    player.flags &= ~SOF_FlipX;
+  if (playerVelocity.x != 0)
+  {
+    if (player.animation == &ANIMATEDSPRITE_QUOTE_IDLE)
+    {
+      AnimatedSpriteObject_SwitchAnimation(&player, &ANIMATEDSPRITE_QUOTE_WALK, true);
+    }
+  }
   else
-    player.flags |= SOF_FlipX;
+  {
+    if (player.animation == &ANIMATEDSPRITE_QUOTE_WALK)
+    {
+      AnimatedSpriteObject_SwitchAnimation(&player, &ANIMATEDSPRITE_QUOTE_IDLE, false);
+    }
+  }
 
   Canvas_PlaceAnimated(&player, true);
   Canvas_Debug(&FONT_NEOSANS);

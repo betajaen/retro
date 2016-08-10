@@ -290,9 +290,11 @@ void  Canvas_DrawFilledRectangle(U8 Colour, Rect rect);
 
 void  Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...);
 
-void  AnimatedSpriteObject_Make(AnimatedSpriteObject* inSprite, Animation* animation, S32 x, S32 y);
+void  AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y);
 
-void  AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* inSprite, bool playing, bool loop);
+void  AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* animatedSpriteObject, bool playing, bool loop);
+
+void  AnimatedSpriteObject_SwitchAnimation(AnimatedSpriteObject* animatedSpriteObject, Animation* newAnimation, bool animate);
 
 void  Palette_Make(Palette* palette);
 
