@@ -2,9 +2,10 @@
 
 #include "retro.c"
 
-static Font   FONT_NEOSANS;
-static Bitmap SPRITESHEET;
-static Sprite SPRITE_TEST;
+static Font           FONT_NEOSANS;
+static Bitmap         SPRITESHEET;
+static Animation      ANIMATEDSPRITE_QUOTE_IDLE;
+static Animation      ANIMATEDSPRITE_QUOTE_WALK;
 
 typedef enum 
 {
@@ -15,6 +16,15 @@ typedef enum
   AC_ACTION,
   AC_CANCEL
 } Actions;
+
+
+typedef enum
+{
+  PF_Idle,
+  PF_Walking
+} PlayerState;
+
+AnimatedSpriteObject player;
 
 void Init(Settings* settings)
 {
@@ -33,30 +43,32 @@ void Init(Settings* settings)
   Input_BindKey(SDL_SCANCODE_ESCAPE, AC_CANCEL);
 
   Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
-  Bitmap_Load("cave.png", &SPRITESHEET);
+  Bitmap_Load("cave.png", &SPRITESHEET, 0);
+
+  Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_IDLE, &SPRITESHEET, 1, 100, 0, 80, 16, 16);
+  Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_WALK, &SPRITESHEET, 4, 120,  0, 80, 16, 16);
 
 }
 
 void Start()
 {
+  AnimatedSpriteObject_Make(&player, &ANIMATEDSPRITE_QUOTE_WALK, 10, 10);
+  AnimatedSpriteObject_PlayAnimation(&player, true, true);
 }
-
-int x = 20, y = 20;
 
 void Step()
 {
   if (Input_GetActionDown(AC_UP))
-    y--;
+    player.y--;
   else if (Input_GetActionDown(AC_DOWN))
-    y++;
+    player.y++;
 
   if (Input_GetActionDown(AC_LEFT))
-    x--;
+    player.x--;
   else if (Input_GetActionDown(AC_RIGHT))
-    x++;
+    player.x++;
 
-
-  Canvas_Splat(&SPRITESHEET, 0, 0, NULL);
-  Canvas_PrintF(x, y, &FONT_NEOSANS, 2, "Hello World");
+  Canvas_PlaceAnimated(&player, true);
+  //Canvas_PrintF(x, y, &FONT_NEOSANS, 2, "Hello World");
   Canvas_Debug(&FONT_NEOSANS);
 }

@@ -91,8 +91,9 @@ char                gInputChar;
 InputCharState      gInputCharState;
 InputActionBinding  gInputActions[RETRO_MAX_INPUT_ACTIONS];
 bool                gQuit;
-Timer               gFpsTimer, gCapTimer;
+Timer               gFpsTimer, gCapTimer, gDeltaTimer;
 U32                 gCountedFrames;
+U32                 gDeltaTime;
 float               gFps;
 
 typedef union
@@ -248,7 +249,7 @@ void Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset)
   outBitmap->imageData = imageData;
 }
 
-void Bitmap_Load(const char* name, Bitmap* outBitmap)
+void Bitmap_Load(const char* name, Bitmap* outBitmap, U8 transparentIndex)
 {
   U32 width, height;
 
@@ -265,8 +266,9 @@ void Bitmap_Load(const char* name, Bitmap* outBitmap)
 
   assert(imageData);
 
-  SDL_Texture* texture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
+  SDL_Texture* texture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
 
+  SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
   void* pixelsVoid;
   int pitch;
   SDL_LockTexture(texture, NULL, &pixelsVoid, &pitch);
@@ -274,7 +276,7 @@ void Bitmap_Load(const char* name, Bitmap* outBitmap)
 
   Palette* palette = &gSettings.palette;
   
-  for(U32 i=0;i < (width * height * 3);i+=3)
+  for(U32 i=0, j=0;i < (width * height * 3);i+=3, j+=4)
   {
     Colour col;
     col.r = imageData[i+0];
@@ -285,9 +287,9 @@ void Bitmap_Load(const char* name, Bitmap* outBitmap)
     int bestDistance = 10000000;
 
     // Match nearest colour by using a treating the two colours as vectors, and matching against the closest distance between the two.
-    for (U32 j=0;j < palette->count;j++)
+    for (U32 k=0;k < palette->count;k++)
     {
-      Colour pal = palette->colours[j];
+      Colour pal = palette->colours[k];
 
       int distance = ((col.r - pal.r) * (col.r - pal.r)) + 
                      ((col.g - pal.g) * (col.g - pal.g)) + 
@@ -296,22 +298,24 @@ void Bitmap_Load(const char* name, Bitmap* outBitmap)
       if (distance < bestDistance)
       {
         bestDistance = distance;
-        bestIndex = j;
+        bestIndex = k;
       }
-
     }
 
     if (bestIndex == 0x100)
-    {
       bestIndex = palette->fallback;
-    }
-
+    
     Colour bestColour = palette->colours[bestIndex];
 
-    pixels[i+0] = bestColour.r; 
-    pixels[i+1] = bestColour.g;
-    pixels[i+2] = bestColour.b;
+    if (bestIndex == transparentIndex)
+      bestColour.a = 0.0f;
+    else
+      bestColour.a = 255.0f;
 
+    pixels[j+0] = bestColour.a; 
+    pixels[j+1] = bestColour.b;
+    pixels[j+2] = bestColour.g;
+    pixels[j+3] = bestColour.r;
   }
 
   SDL_UnlockTexture(texture);
@@ -330,6 +334,40 @@ void Sprite_Make(Sprite* inSprite, Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h)
   inSprite->rect.y = y;
   inSprite->rect.w = w;
   inSprite->rect.h = h;
+}
+
+void Retro_Animation_Load(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight, S32 frameOffsetX, S32 frameOffsetY)
+{
+  assert(numFrames < RETRO_MAX_ANIMATED_SPRITE_FRAMES);
+  assert(inAnimatedSprite);
+  assert(bitmap);
+
+  inAnimatedSprite->bitmap = bitmap;
+  inAnimatedSprite->frameCount = numFrames;
+  inAnimatedSprite->frameLength = frameLengthMilliseconds;
+
+  SDL_Rect frame;
+  frame.x = originX;
+  frame.y = originY;
+  frame.w = frameWidth;
+  frame.h = frameHeight;
+
+  for(U8 i=0;i < numFrames;i++)
+  {
+    inAnimatedSprite->frames[i] = frame;
+    frame.x += frameOffsetX;
+    frame.y += frameOffsetY;
+  }
+}
+
+void  Animation_LoadHorizontal(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight)
+{
+  Retro_Animation_Load(inAnimatedSprite, bitmap, numFrames, frameLengthMilliseconds, originX, originY, frameWidth, frameHeight, frameWidth, 0);
+}
+
+void  Animation_LoadVertical(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight)
+{
+  Retro_Animation_Load(inAnimatedSprite, bitmap, numFrames, frameLengthMilliseconds, originX, originY, frameWidth, frameHeight, 0, frameHeight);
 }
 
 void  Screen_SetSize(Size size)
@@ -377,7 +415,7 @@ U32 Canvas_GetHeight()
   return gCanvasSize.h;
 }
 
-void Canvas_Splat(Bitmap* bitmap, U32 x, U32 y, Rect* srcRectangle)
+void Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle)
 {
   SDL_Rect src, dst;
   SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
@@ -405,7 +443,7 @@ void Canvas_Splat(Bitmap* bitmap, U32 x, U32 y, Rect* srcRectangle)
   SDL_RenderCopy(gRenderer, texture, &src, &dst);
 }
 
-void  Canvas_Splat2(Bitmap* bitmap, U32 x, U32 y, SDL_Rect* srcRectangle)
+void  Canvas_Splat2(Bitmap* bitmap, S32 x, S32 y, SDL_Rect* srcRectangle)
 {
   assert(srcRectangle);
 
@@ -428,10 +466,71 @@ void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectang
   SDL_RenderCopy(gRenderer, texture, srcRectangle, dstRectangle);
 }
 
-void Canvas_Place(Sprite* sprite, U32 x, U32 y)
+void Canvas_SplatFlip(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, U8 flipFlags)
+{
+  assert(srcRectangle);
+
+  SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
+  SDL_RenderCopyEx(gRenderer, texture, srcRectangle, dstRectangle, 0.0f, NULL, flipFlags);
+}
+
+void Canvas_Place(StaticSpriteObject* spriteObject)
+{
+  assert(spriteObject);
+  Canvas_Splat2(spriteObject->sprite->bitmap, spriteObject->x, spriteObject->y, &spriteObject->sprite->rect);
+}
+
+void Canvas_Place2(Sprite* sprite, S32 x, S32 y)
 {
   assert(sprite);
   Canvas_Splat2(sprite->bitmap, x, y, &sprite->rect);
+}
+
+void Canvas_PlaceAnimated(AnimatedSpriteObject* spriteObject, bool updateTiming)
+{
+  if (updateTiming && (spriteObject->flags & SOF_Animation) != 0)
+  {
+    spriteObject->frameTime += gDeltaTime;
+
+    if (spriteObject->frameTime >= 1000)
+      spriteObject->frameTime = 0; // Prevent spiral out of control.
+
+    while(spriteObject->frameTime > spriteObject->animation->frameLength)
+    {
+      spriteObject->frameNumber++;
+      spriteObject->frameTime -= spriteObject->animation->frameLength;
+
+      if (spriteObject->frameNumber >= spriteObject->animation->frameCount)
+      {
+        if (spriteObject->flags & SOF_AnimationOnce)
+        {
+          spriteObject->flags &= ~SOF_Animation;
+          spriteObject->frameNumber = spriteObject->animation->frameCount - 1; // Stop
+          break;
+        }
+        else
+        {
+          spriteObject->frameNumber = 0; // Loop around.
+        }
+      }
+    }
+  }
+
+  assert(spriteObject->frameNumber < spriteObject->animation->frameCount);
+  Canvas_PlaceAnimated2(spriteObject->animation, spriteObject->x, spriteObject->y, spriteObject->frameNumber, spriteObject->flags & FF_Mask);
+}
+
+void Canvas_PlaceAnimated2(Animation* animatedSprite, S32 x, S32 y, U8 frame, U8 flipFlags)
+{
+  assert(animatedSprite);
+  assert(frame < animatedSprite->frameCount);
+  SDL_Rect src = animatedSprite->frames[frame];
+  SDL_Rect dst;
+  dst.x = x;
+  dst.y = y;
+  dst.w = src.w;
+  dst.h = src.h;
+  Canvas_SplatFlip(animatedSprite->bitmap, &dst, &src, flipFlags & FF_Mask);
 }
 
 void Canvas_PlaceScaled(Sprite* sprite, U32 x, U32 y, U32 scale)
@@ -760,13 +859,40 @@ void Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...)
   Canvas_PrintStr(x, y, font, colour, gFmtScratch);
 }
 
+void AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y)
+{
+  assert(inAnimatedSpriteObject);
+  inAnimatedSpriteObject->animation = animation;
+  inAnimatedSpriteObject->flags = 0;
+  inAnimatedSpriteObject->frameNumber = 0;
+  inAnimatedSpriteObject->frameTime = 0;
+  inAnimatedSpriteObject->x = x;
+  inAnimatedSpriteObject->y = y;
+}
+
+void AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* inAnimatedSpriteObject, bool playing, bool loop)
+{
+  assert(inAnimatedSpriteObject);
+
+  if (playing)
+    inAnimatedSpriteObject->flags |= SOF_Animation;
+  else
+    inAnimatedSpriteObject->flags &= ~SOF_Animation;
+
+  if (!loop)
+    inAnimatedSpriteObject->flags |= SOF_AnimationOnce;
+  else
+    inAnimatedSpriteObject->flags &= ~SOF_AnimationOnce;
+
+}
+
 void  Canvas_Debug(Font* font)
 {
   assert(font);
   RetroFourByteUnion f;
   f.q = Scope_GetName();
 
-  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps);
+  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime);
 }
 
 void  Font_Make(Font* font)
@@ -1116,6 +1242,8 @@ void Frame()
 {
   Timer_Start(&gCapTimer);
 
+  gDeltaTime = Timer_GetTicks(&gDeltaTimer);
+
   SDL_Event event;
   gInputCharState = ICS_None;
 
@@ -1185,6 +1313,7 @@ void Frame()
   Canvas_Flip();
   ++gCountedFrames;
 
+  Timer_Start(&gDeltaTimer);
 }
 
 
@@ -1242,13 +1371,13 @@ int main(int argc, char **argv)
 
   gCountedFrames = 0;
   Timer_Start(&gFpsTimer);
+  Timer_Start(&gDeltaTimer);
 
   #ifdef RETRO_WINDOWS
 
   while(gQuit == false)
   {
     Frame();
-
     float frameTicks = Timer_GetTicks(&gCapTimer);
     if (frameTicks < (1000.0f / RETRO_FRAME_RATE))
     {

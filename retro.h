@@ -56,6 +56,10 @@
 #define RETRO_MAX_INPUT_BINDINGS 4
 #endif
 
+#ifndef RETRO_MAX_ANIMATED_SPRITE_FRAMES
+#define RETRO_MAX_ANIMATED_SPRITE_FRAMES 8
+#endif
+
 #define RETRO_UNUSED(X) (void)X
 #define RETRO_ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
@@ -103,6 +107,41 @@ typedef struct
   Bitmap*  bitmap;
   SDL_Rect rect;
 } Sprite;
+
+typedef struct
+{
+  Bitmap*  bitmap;
+  U8       frameCount;
+  U16      frameLength;
+  SDL_Rect frames[RETRO_MAX_ANIMATED_SPRITE_FRAMES];
+} Animation;
+
+typedef enum
+{
+  // Flip drawing X
+  SOF_FlipX         = 1,
+  // Flip drawing Y
+  SOF_FlipY         = 2,
+  // If AnimatedSpriteObject object then play animation
+  SOF_Animation     = 4,
+  // If AnimatedSpriteObject object then don't loop around the animation
+  SOF_AnimationOnce = 8,
+} SpriteObjectFlags;
+
+typedef struct
+{
+  Sprite* sprite;
+  S32     x, y;
+  S8      flags;
+} StaticSpriteObject;
+
+typedef struct
+{
+  Animation* animation;
+  S32        x, y;
+  U8         frameNumber, flags;
+  U16        frameTime;
+} AnimatedSpriteObject;
 
 typedef struct
 {
@@ -185,13 +224,17 @@ Colour Colour_Make(U8 r, U8 g, U8 b);
 void* Resource_Load(const char* name, U32* outSize);
 
 // Loads a bitmap and matches the palette to the canvas palette best it can.
-void  Bitmap_Load(const char* name, Bitmap* outBitmap);
+void  Bitmap_Load(const char* name, Bitmap* outBitmap, U8 transparentIndex);
 
 // Loads a bitmap with the palette order matching exactly the canvas palette.
 // Offset is given to offset the loaded order by N colours
 void  Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset);
 
 void  Sprite_Make(Sprite* inSprite, Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
+
+void  Animation_LoadHorizontal(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+
+void  Animation_LoadVertical(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
 
 void  Screen_SetSize(Size size);
 
@@ -205,13 +248,30 @@ U32   Canvas_GetWidth();
 
 U32   Canvas_GetHeight();
 
-void  Canvas_Splat(Bitmap* bitmap, U32 x, U32 y, Rect* srcRectangle);
+void  Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle);
 
-void  Canvas_Splat2(Bitmap* bitmap, U32 x, U32 y, SDL_Rect* srcRectangle);
+void  Canvas_Splat2(Bitmap* bitmap, S32 x, S32 y, SDL_Rect* srcRectangle);
 
 void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle);
 
-void  Canvas_Place(Sprite* sprite, U32 x, U32 y);
+typedef enum
+{
+  FF_None     = SDL_FLIP_NONE,
+  FF_FlipHorz = SDL_FLIP_HORIZONTAL,
+  FF_FlipVert = SDL_FLIP_VERTICAL,
+  FF_FlipDiag = FF_FlipHorz | FF_FlipVert,
+  FF_Mask     = FF_FlipHorz | FF_FlipVert
+} FlipFlags;
+
+void  Canvas_SplatFlip(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, U8 flipFlags);
+
+void  Canvas_Place(StaticSpriteObject* spriteObject);
+
+void  Canvas_Place2(Sprite* sprite, S32 x, S32 y);
+
+void  Canvas_PlaceAnimated(AnimatedSpriteObject* spriteObject, bool updateTiming);
+
+void  Canvas_PlaceAnimated2(Animation* animatedSprite, S32 x, S32 y, U8 frame, U8 flipFlags);
 
 void  Canvas_PlaceScaled(Sprite* sprite, U32 x, U32 y, U32 scale);
 
@@ -228,6 +288,10 @@ void  Canvas_DrawRectangle(U8 Colour, Rect rect);
 void  Canvas_DrawFilledRectangle(U8 Colour, Rect rect);
 
 void  Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...);
+
+void  AnimatedSpriteObject_Make(AnimatedSpriteObject* inSprite, Animation* animation, S32 x, S32 y);
+
+void  AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* inSprite, bool playing, bool loop);
 
 void  Palette_Make(Palette* palette);
 
