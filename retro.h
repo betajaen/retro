@@ -112,6 +112,7 @@ typedef struct
 {
   Bitmap*  bitmap;
   U8       frameCount;
+  U8       w, h;
   U16      frameLength;
   SDL_Rect frames[RETRO_MAX_ANIMATED_SPRITE_FRAMES];
 } Animation;
@@ -244,9 +245,9 @@ void  Canvas_SetSize(Size size);
 
 Size  Canvas_GetSize();
 
-U32   Canvas_GetWidth();
+S32   Canvas_GetWidth();
 
-U32   Canvas_GetHeight();
+S32   Canvas_GetHeight();
 
 void  Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle);
 

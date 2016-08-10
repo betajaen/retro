@@ -25,6 +25,7 @@ typedef enum
 } PlayerState;
 
 AnimatedSpriteObject player;
+Point playerVelocity;
 
 void Init(Settings* settings)
 {
@@ -52,23 +53,55 @@ void Init(Settings* settings)
 
 void Start()
 {
-  AnimatedSpriteObject_Make(&player, &ANIMATEDSPRITE_QUOTE_WALK, 10, 10);
+  AnimatedSpriteObject_Make(&player, &ANIMATEDSPRITE_QUOTE_WALK, Canvas_GetWidth() / 2, Canvas_GetHeight() / 2);
   AnimatedSpriteObject_PlayAnimation(&player, true, true);
+
+  playerVelocity.x = 0;
+  playerVelocity.y = 0;
 }
 
 void Step()
 {
   if (Input_GetActionDown(AC_UP))
-    player.y--;
+    playerVelocity.y -= 1;
   else if (Input_GetActionDown(AC_DOWN))
-    player.y++;
+    playerVelocity.y += 1;
 
   if (Input_GetActionDown(AC_LEFT))
-    player.x--;
+    playerVelocity.x--;
   else if (Input_GetActionDown(AC_RIGHT))
-    player.x++;
+    playerVelocity.x++;
+  else
+  {
+    if (playerVelocity.x < 0)
+      playerVelocity.x++;
+    else if (playerVelocity.x > 0)
+      playerVelocity.x--;
+  }
+
+  if (playerVelocity.x < -8)
+    playerVelocity.x = -8;
+  else if (playerVelocity.x > 8)
+    playerVelocity.x = 8;
+
+  player.x += playerVelocity.x;
+
+  if (player.x < 0)
+  {
+    player.x = 0;
+    playerVelocity.x = 0;
+  }
+  else if (player.x + player.animation->w > Canvas_GetWidth())
+  {
+    player.x = Canvas_GetWidth() - player.animation->w;
+    playerVelocity.x = 0;
+  }
+
+  if (playerVelocity.x >= 0)
+    player.flags &= ~SOF_FlipX;
+  else
+    player.flags |= SOF_FlipX;
 
   Canvas_PlaceAnimated(&player, true);
-  //Canvas_PrintF(x, y, &FONT_NEOSANS, 2, "Hello World");
   Canvas_Debug(&FONT_NEOSANS);
 }

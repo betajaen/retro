@@ -345,6 +345,8 @@ void Retro_Animation_Load(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFra
   inAnimatedSprite->bitmap = bitmap;
   inAnimatedSprite->frameCount = numFrames;
   inAnimatedSprite->frameLength = frameLengthMilliseconds;
+  inAnimatedSprite->w = frameWidth;
+  inAnimatedSprite->h = frameHeight;
 
   SDL_Rect frame;
   frame.x = originX;
@@ -358,6 +360,7 @@ void Retro_Animation_Load(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFra
     frame.x += frameOffsetX;
     frame.y += frameOffsetY;
   }
+
 }
 
 void  Animation_LoadHorizontal(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight)
@@ -405,12 +408,12 @@ Size  Canvas_GetSize()
   return gCanvasSize;
 }
 
-U32 Canvas_GetWidth()
+S32 Canvas_GetWidth()
 {
   return gCanvasSize.w;
 }
 
-U32 Canvas_GetHeight()
+S32 Canvas_GetHeight()
 {
   return gCanvasSize.h;
 }
