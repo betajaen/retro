@@ -249,8 +249,6 @@ S32   Canvas_GetHeight();
 
 void  Canvas_Set(U8 id);
 
-void  Canvas_Clear();
-
 typedef enum
 {
   // Clear each frame
@@ -261,7 +259,7 @@ typedef enum
   CNF_Render     = 4,
 } CanvasFlags;
 
-void  Canvas_SetFlags(U8 id, U8 flags);
+void  Canvas_SetFlags(U8 id, U8 flags, U8 clearColour);
 
 void  Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle);
 

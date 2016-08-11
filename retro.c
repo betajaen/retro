@@ -85,6 +85,7 @@ SDL_Renderer*       gRenderer;
 SDL_Texture*        gCanvasTexture;
 SDL_Texture*        gCanvasTextures[RETRO_CANVAS_COUNT];
 U8                  gCanvasFlags[RETRO_CANVAS_COUNT];
+U8                  gCanvasBackgroundColour[RETRO_CANVAS_COUNT];
 Settings            gSettings;
 Size                gCanvasSize;
 LinearAllocator     gArena;
@@ -407,11 +408,12 @@ void Canvas_Set(U8 id)
   SDL_SetRenderTarget(gRenderer, gCanvasTexture);
 }
 
-void Canvas_SetFlags(U8 id, U8 flags)
+void Canvas_SetFlags(U8 id, U8 flags, U8 colour)
 {
   assert(id < RETRO_CANVAS_COUNT);
 
   gCanvasFlags[id] = flags;
+  gCanvasBackgroundColour[id] = colour;
 
   if (flags & CNF_Blend)
     SDL_SetTextureBlendMode(gCanvasTextures[id], SDL_BLENDMODE_BLEND);
@@ -570,6 +572,11 @@ void Canvas_Flip()
 void Canvas_Clear()
 {
   SDL_RenderClear(gRenderer);
+}
+
+void Canvas_ClearColour(U8 colour)
+{
+  
 }
 
 void  Palette_Make(Palette* palette)
@@ -1331,7 +1338,10 @@ void Frame()
     if (gCanvasFlags[i] & CNF_Clear)
     {
       Canvas_Set(i);
+      Colour col = Palette_GetColour(&gSettings.palette, gCanvasBackgroundColour[i]);
+      SDL_SetRenderDrawColor(gRenderer, col.r, col.g, col.b, 0x00);
       Canvas_Clear();
+      SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0x00);
     }
   }
 
@@ -1411,7 +1421,7 @@ int main(int argc, char **argv)
     if (i > 0)
       flags |= CNF_Blend;
 
-    Canvas_SetFlags(i, flags);
+    Canvas_SetFlags(i, flags, 0);
   }
 
   Canvas_Set(0);
