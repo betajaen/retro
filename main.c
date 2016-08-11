@@ -6,6 +6,7 @@ static Font           FONT_NEOSANS;
 static Bitmap         SPRITESHEET;
 static Animation      ANIMATEDSPRITE_QUOTE_IDLE;
 static Animation      ANIMATEDSPRITE_QUOTE_WALK;
+static Sound          SOUND_COIN;
 
 typedef enum 
 {
@@ -49,6 +50,7 @@ void Init(Settings* settings)
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_IDLE, &SPRITESHEET, 1, 100, 0, 80, 16, 16);
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_WALK, &SPRITESHEET, 4, 120,  0, 80, 16, 16);
 
+  Sound_Load(&SOUND_COIN, "coin.wav");
 }
 
 void Start()
@@ -62,6 +64,11 @@ void Start()
 
 void Step()
 {
+
+  if (Input_GetActionPressed(AC_ACTION))
+  {
+    Sound_Play(&SOUND_COIN, 128);
+  }
 
   if (Input_GetActionDown(AC_UP))
     playerVelocity.y -= 1;

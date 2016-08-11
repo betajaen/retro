@@ -64,6 +64,10 @@
 #define RETRO_CANVAS_COUNT 2
 #endif
 
+#ifndef RETRO_MAX_SOUND_OBJECTS
+#define RETRO_MAX_SOUND_OBJECTS 16
+#endif
+
 #define RETRO_UNUSED(X) (void)X
 #define RETRO_ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
@@ -182,6 +186,12 @@ typedef struct
   U32    start, paused;
   U8     flags;
 } Timer;
+
+typedef struct
+{
+  U32 length;
+  U8* buffer;
+} Sound;
 
 #define Point_Translate(P, X_VALUE, Y_VALUE) \
   (P)->x += X_VALUE; \
@@ -307,6 +317,12 @@ void  AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, An
 void  AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* animatedSpriteObject, bool playing, bool loop);
 
 void  AnimatedSpriteObject_SwitchAnimation(AnimatedSpriteObject* animatedSpriteObject, Animation* newAnimation, bool animate);
+
+void  Sound_Load(Sound* sound, const char* name);
+
+void  Sound_Play(Sound* sound, U8 volume);
+
+void  Sound_Clear();
 
 void  Palette_Make(Palette* palette);
 

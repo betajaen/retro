@@ -80,6 +80,19 @@ typedef enum
   ICS_Enter
 } InputCharState;
 
+typedef struct
+{
+  SDL_AudioDeviceID device;
+  SDL_AudioSpec     spec;
+} SoundDevice;
+
+typedef struct Retro_SoundObject
+{
+  Sound* sound;
+  U32    p;
+  U8     volume;
+} SoundObject;
+
 SDL_Window*         gWindow;
 SDL_Renderer*       gRenderer;
 SDL_Texture*        gCanvasTexture;
@@ -99,6 +112,8 @@ Timer               gFpsTimer, gCapTimer, gDeltaTimer;
 U32                 gCountedFrames;
 U32                 gDeltaTime;
 float               gFps;
+SoundDevice         gSoundDevice;
+SoundObject         gSoundObject[RETRO_MAX_SOUND_OBJECTS];
 
 typedef union
 {
@@ -574,11 +589,6 @@ void Canvas_Clear()
   SDL_RenderClear(gRenderer);
 }
 
-void Canvas_ClearColour(U8 colour)
-{
-  
-}
-
 void  Palette_Make(Palette* palette)
 {
   assert(palette);
@@ -916,8 +926,81 @@ void  Canvas_Debug(Font* font)
   assert(font);
   RetroFourByteUnion f;
   f.q = Scope_GetName();
+  
+  U32 soundObjectCount = 0;
+  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  {
+    SoundObject* soundObj = &gSoundObject[i];
 
-  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime);
+    if (soundObj->sound != NULL)
+      soundObjectCount++;
+  }
+
+  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount);
+}
+
+void  Sound_Load(Sound* sound, const char* name)
+{
+  U32 resourceSize = 0;
+  void* resource = Resource_Load(name, &resourceSize);
+
+  SDL_LoadWAV_RW(SDL_RWFromConstMem(resource, resourceSize), 0, &gSoundDevice.spec, &sound->buffer, &sound->length);
+}
+
+void  Sound_Play(Sound* sound, U8 volume)
+{
+  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  {
+    SoundObject* soundObj = &gSoundObject[i];
+    if (soundObj->sound != NULL)
+     continue;
+
+    soundObj->sound = sound;
+    soundObj->p = 0;
+    soundObj->volume = volume > SDL_MIX_MAXVOLUME ? SDL_MIX_MAXVOLUME : volume;
+
+    return;
+  }
+}
+
+void  Sound_Clear()
+{
+  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  {
+    SoundObject* soundObj = &gSoundObject[i];
+
+    soundObj->sound = NULL;
+    soundObj->p = 0;
+    soundObj->volume = 0;
+  }
+}
+
+void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
+{
+  SDL_memset(stream, 0, streamLength);
+
+  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  {
+    SoundObject* soundObj = &gSoundObject[i];
+
+    if (soundObj->sound == NULL)
+      continue;
+
+    S32 soundLength = soundObj->sound->length;
+    
+    S32 mixLength = (streamLength > soundLength ? soundLength : streamLength);
+    SDL_MixAudioFormat(stream, soundObj->sound->buffer + soundObj->p, AUDIO_S16LSB, mixLength, soundObj->volume);
+
+    soundObj->p += mixLength;
+
+    if (soundObj->p >= soundObj->sound->length)
+    {
+      // Finished
+      soundObj->sound = NULL;
+      soundObj->p = 0;
+      soundObj->volume = 0;
+    }
+  }
 }
 
 void  Font_Make(Font* font)
@@ -1370,7 +1453,7 @@ int main(int argc, char **argv)
 #endif
 {
 
-  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
+  SDL_Init(SDL_INIT_EVERYTHING);
 
   gArena.begin = malloc(RETRO_ARENA_STACK_SIZE);
   gArena.current = gArena.begin;
@@ -1404,6 +1487,23 @@ int main(int argc, char **argv)
     SDL_WINDOW_SHOWN
   );
 
+  memset(&gSoundObject, 0, sizeof(gSoundObject));
+  memset(&gSoundDevice, 0, sizeof(SoundDevice));
+
+  gSoundDevice.spec.freq = 48000;
+  gSoundDevice.spec.format = AUDIO_S16LSB;
+  gSoundDevice.spec.channels = 2;
+  gSoundDevice.spec.samples = 4096;
+  gSoundDevice.spec.callback = Retro_SDL_SoundCallback;
+  gSoundDevice.spec.userdata = NULL;
+
+  gSoundDevice.device = SDL_OpenAudioDevice(NULL, 0, &gSoundDevice.spec, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
+
+  if (gSoundDevice.device == 0)
+  {
+    printf("Sound Init Error: %s\n", SDL_GetError());
+  }
+
   gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
 
   Init(&gSettings);
@@ -1424,6 +1524,7 @@ int main(int argc, char **argv)
 
   gQuit = false;
 
+  SDL_PauseAudioDevice(gSoundDevice.device, 0);
   Restart();
 
   gCountedFrames = 0;
@@ -1451,6 +1552,7 @@ int main(int argc, char **argv)
   #endif
 
   free(gArena.begin);
+  SDL_CloseAudioDevice(gSoundDevice.device);
   SDL_Quit();
   return 0;
 }
