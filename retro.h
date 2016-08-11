@@ -253,8 +253,12 @@ void  Canvas_Clear();
 
 typedef enum
 {
+  // Clear each frame
   CNF_Clear      = 1,
-  CNF_Blend      = 2
+  // Apply blending to the canvas underneath
+  CNF_Blend      = 2,
+  // Render this canvas
+  CNF_Render     = 4,
 } CanvasFlags;
 
 void  Canvas_SetFlags(U8 id, U8 flags);

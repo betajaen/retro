@@ -1342,7 +1342,10 @@ void Frame()
 
   for (int i=0;i < RETRO_CANVAS_COUNT;i++)
   {
-    SDL_RenderCopy(gRenderer, gCanvasTextures[i], NULL, NULL);
+    if (gCanvasFlags[i] & CNF_Render)
+    {
+      SDL_RenderCopy(gRenderer, gCanvasTextures[i], NULL, NULL);
+    }
   }
 
   Canvas_Flip();
@@ -1404,7 +1407,7 @@ int main(int argc, char **argv)
   for (U8 i=0;i < RETRO_CANVAS_COUNT;i++)
   {
     gCanvasTextures[i] = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_TARGET, gCanvasSize.w, gCanvasSize.h);
-    int flags = CNF_Clear;
+    int flags = CNF_Clear | CNF_Render;
     if (i > 0)
       flags |= CNF_Blend;
 
