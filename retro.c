@@ -82,14 +82,13 @@ typedef enum
 
 typedef struct
 {
-  SDL_AudioDeviceID device;
-  SDL_AudioSpec     spec;
+  SDL_AudioSpec     specification;
 } SoundDevice;
 
 typedef struct Retro_SoundObject
 {
   Sound* sound;
-  U32    p;
+  S32    p;
   U8     volume;
 } SoundObject;
 
@@ -941,10 +940,39 @@ void  Canvas_Debug(Font* font)
 
 void  Sound_Load(Sound* sound, const char* name)
 {
+
+  #ifdef RETRO_WINDOWS
   U32 resourceSize = 0;
   void* resource = Resource_Load(name, &resourceSize);
+  SDL_LoadWAV_RW(SDL_RWFromConstMem(resource, resourceSize), 0, &sound->spec, &sound->buffer, &sound->length);
+  #else
+  RETRO_MAKE_BROWSER_PATH(name);
+  SDL_LoadWAV(RETRO_BROWSER_PATH, &sound->spec, &sound->buffer, &sound->length);
+  #endif
 
-  SDL_LoadWAV_RW(SDL_RWFromConstMem(resource, resourceSize), 0, &gSoundDevice.spec, &sound->buffer, &sound->length);
+  if (sound->spec.format != gSoundDevice.specification.format || sound->spec.freq != gSoundDevice.specification.freq || sound->spec.channels != gSoundDevice.specification.channels)
+  {
+    // Do a conversion
+    SDL_AudioCVT cvt;
+    SDL_BuildAudioCVT(&cvt, sound->spec.format, sound->spec.channels, sound->spec.freq, gSoundDevice.specification.format, gSoundDevice.specification.channels, gSoundDevice.specification.freq);
+
+    cvt.buf = malloc(sound->length * cvt.len_mult);
+    memcpy(cvt.buf, sound->buffer, sound->length);
+    cvt.len = sound->length;
+    SDL_ConvertAudio(&cvt);
+    SDL_FreeWAV(sound->buffer);
+
+    sound->buffer = cvt.buf;
+    sound->length = cvt.len_cvt;
+    sound->spec = gSoundDevice.specification;
+
+    // printf("Loaded Audio %s but had to convert it into a internal format.\n", name);
+  }
+  else
+  {
+   // printf("Loaded Audio %s\n", name);
+  }
+
 }
 
 void  Sound_Play(Sound* sound, U8 volume)
@@ -989,7 +1017,15 @@ void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
     S32 soundLength = soundObj->sound->length;
     
     S32 mixLength = (streamLength > soundLength ? soundLength : streamLength);
-    SDL_MixAudioFormat(stream, soundObj->sound->buffer + soundObj->p, AUDIO_S16LSB, mixLength, soundObj->volume);
+    
+
+    if (soundObj->p + mixLength >= soundLength)
+    {
+      mixLength = soundLength - soundObj->p;
+    }
+
+    
+    SDL_MixAudioFormat(stream, soundObj->sound->buffer + soundObj->p, soundObj->sound->spec.format, mixLength, SDL_MIX_MAXVOLUME / 2);
 
     soundObj->p += mixLength;
 
@@ -1490,19 +1526,34 @@ int main(int argc, char **argv)
   memset(&gSoundObject, 0, sizeof(gSoundObject));
   memset(&gSoundDevice, 0, sizeof(SoundDevice));
 
-  gSoundDevice.spec.freq = 48000;
-  gSoundDevice.spec.format = AUDIO_S16LSB;
-  gSoundDevice.spec.channels = 2;
-  gSoundDevice.spec.samples = 4096;
-  gSoundDevice.spec.callback = Retro_SDL_SoundCallback;
-  gSoundDevice.spec.userdata = NULL;
+  SDL_AudioSpec want, got;
+  memset(&want, 0, sizeof(want));
+  memset(&got, 0, sizeof(got));
 
-  gSoundDevice.device = SDL_OpenAudioDevice(NULL, 0, &gSoundDevice.spec, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
+  want.freq = RETRO_AUDIO_FREQUENCY;
+  want.format = AUDIO_F32;
+  want.channels = RETRO_AUDIO_CHANNELS;
+  want.samples = RETRO_AUDIO_SAMPLES;
+  want.callback = Retro_SDL_SoundCallback;
+  want.userdata = NULL;
 
-  if (gSoundDevice.device == 0)
+  if (SDL_OpenAudio(&want, &got) < 0)
   {
-    printf("Sound Init Error: %s\n", SDL_GetError());
+    want.format = AUDIO_S16;
+    if (SDL_OpenAudio(&want, &got) < 0)
+    {
+      printf("Sound Init Error: %s\n", SDL_GetError());
+    }
   }
+
+  gSoundDevice.specification = got;
+//
+//  printf("freq %i, %i\n", want.freq, got.freq);
+//  printf("format %i, %i\n", want.format, got.format);
+//  printf("channels %i, %i\n", want.channels, got.channels);
+//  printf("samples %i, %i\n", want.samples, got.samples);
+//  printf("callback %p, %p\n", want.callback, got.callback);
+
 
   gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
 
@@ -1524,7 +1575,7 @@ int main(int argc, char **argv)
 
   gQuit = false;
 
-  SDL_PauseAudioDevice(gSoundDevice.device, 0);
+  SDL_PauseAudio(0);
   Restart();
 
   gCountedFrames = 0;
@@ -1552,7 +1603,7 @@ int main(int argc, char **argv)
   #endif
 
   free(gArena.begin);
-  SDL_CloseAudioDevice(gSoundDevice.device);
+  SDL_CloseAudio();
   SDL_Quit();
   return 0;
 }

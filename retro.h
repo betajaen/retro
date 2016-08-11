@@ -68,6 +68,18 @@
 #define RETRO_MAX_SOUND_OBJECTS 16
 #endif
 
+#ifndef RETRO_AUDIO_FREQUENCY
+#define RETRO_AUDIO_FREQUENCY 48000
+#endif
+
+#ifndef RETRO_AUDIO_CHANNELS
+#define RETRO_AUDIO_CHANNELS 2
+#endif
+
+#ifndef RETRO_AUDIO_SAMPLES
+#define RETRO_AUDIO_SAMPLES 4096
+#endif 
+
 #define RETRO_UNUSED(X) (void)X
 #define RETRO_ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
@@ -189,8 +201,9 @@ typedef struct
 
 typedef struct
 {
-  U32 length;
+  S32 length;
   U8* buffer;
+  SDL_AudioSpec spec;
 } Sound;
 
 #define Point_Translate(P, X_VALUE, Y_VALUE) \
