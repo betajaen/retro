@@ -86,7 +86,7 @@ typedef double   F64;
 
 typedef struct
 {
-  void*  handle;
+  SDL_Texture*  texture;
   U8*    imageData;
   U16    w, h;
 } Bitmap;

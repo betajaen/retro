@@ -249,7 +249,7 @@ void Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset)
 
   outBitmap->w = width;
   outBitmap->h = height;
-  outBitmap->handle = texture;
+  outBitmap->texture = texture;
   outBitmap->imageData = imageData;
 }
 
@@ -326,7 +326,7 @@ void Bitmap_Load(const char* name, Bitmap* outBitmap, U8 transparentIndex)
 
   outBitmap->w = width;
   outBitmap->h = height;
-  outBitmap->handle = texture;
+  outBitmap->texture = texture;
   outBitmap->imageData = imageData;
 }
 
@@ -425,7 +425,7 @@ void Canvas_SetFlags(U8 id, U8 flags, U8 colour)
 void Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle)
 {
   SDL_Rect src, dst;
-  SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
+  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
 
   if (srcRectangle == NULL)
   {
@@ -455,7 +455,7 @@ void  Canvas_Splat2(Bitmap* bitmap, S32 x, S32 y, SDL_Rect* srcRectangle)
   assert(srcRectangle);
 
   SDL_Rect dst;
-  SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
+  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
 
   dst.x = x;
   dst.y = y;
@@ -469,7 +469,7 @@ void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectang
 {
   assert(srcRectangle);
 
-  SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
+  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
   SDL_RenderCopy(gRenderer, texture, srcRectangle, dstRectangle);
 }
 
@@ -477,7 +477,7 @@ void Canvas_SplatFlip(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRecta
 {
   assert(srcRectangle);
 
-  SDL_Texture* texture = (SDL_Texture*) bitmap->handle;
+  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
   SDL_RenderCopyEx(gRenderer, texture, srcRectangle, dstRectangle, 0.0f, NULL, flipFlags);
 }
 
@@ -831,7 +831,7 @@ void Canvas_PrintStr(U32 x, U32 y, Font* font, U8 colour, const char* str)
   d.w = 0;
   d.h = s.h; 
 
-  RETRO_SDL_TEXTURE_PUSH_RGB(t, (SDL_Texture*) font->bitmap.handle, rgb);
+  RETRO_SDL_TEXTURE_PUSH_RGB(t, font->bitmap.texture, rgb);
 
   while(true)
   {
@@ -850,12 +850,12 @@ void Canvas_PrintStr(U32 x, U32 y, Font* font, U8 colour, const char* str)
     s.w = font->widths[c];
     d.w = s.w;
 
-    SDL_RenderCopy(gRenderer, (SDL_Texture*) font->bitmap.handle, &s, &d);
+    SDL_RenderCopy(gRenderer, (SDL_Texture*) font->bitmap.texture, &s, &d);
 
     d.x += d.w;
   }
 
-  RETRO_SDL_TEXTURE_POP_RGB(t, (SDL_Texture*) font->bitmap.handle);
+  RETRO_SDL_TEXTURE_POP_RGB(t, (SDL_Texture*) font->bitmap.texture);
 
 }
 
@@ -927,16 +927,12 @@ void  Font_Make(Font* font)
   font->height = 0;
   font->bitmap.w = 0;
   font->bitmap.h = 0;
-  font->bitmap.handle = NULL;
+  font->bitmap.texture = NULL;
   font->bitmap.imageData = NULL;
 }
 
 void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour transparentColour)
 {
-  RETRO_UNUSED(outFont);
-  RETRO_UNUSED(markerColour);
-  RETRO_UNUSED(transparentColour);
-
   U32 width, height;
 
   U8* imageData = NULL;
@@ -961,7 +957,7 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
   SDL_LockTexture(texture, NULL, &pixelsVoid, &pitch);
   U8* pixels = (U8*) pixelsVoid;
   
-  U32 i,j;
+  U32 i, j;
 
   U32 lx = 0xCAFEBEEF;
   U8  ch = '!';
@@ -1014,7 +1010,7 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
   outFont->height = height - 1;
   outFont->bitmap.w = width;
   outFont->bitmap.h = height - 1;
-  outFont->bitmap.handle = texture;
+  outFont->bitmap.texture = texture;
   outFont->bitmap.imageData = imageData;
 }
 
