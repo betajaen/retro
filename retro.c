@@ -82,6 +82,9 @@ typedef enum
 
 SDL_Window*         gWindow;
 SDL_Renderer*       gRenderer;
+SDL_Texture*        gCanvasTexture;
+SDL_Texture*        gCanvasTextures[RETRO_CANVAS_COUNT];
+U8                  gCanvasFlags[RETRO_CANVAS_COUNT];
 Settings            gSettings;
 Size                gCanvasSize;
 LinearAllocator     gArena;
@@ -373,17 +376,6 @@ void  Animation_LoadVertical(Animation* inAnimatedSprite, Bitmap* bitmap, U8 num
   Retro_Animation_Load(inAnimatedSprite, bitmap, numFrames, frameLengthMilliseconds, originX, originY, frameWidth, frameHeight, 0, frameHeight);
 }
 
-void  Screen_SetSize(Size size)
-{
-  if (gWindow == NULL)
-  {
-    SDL_SetWindowSize(gWindow, size.w, size.h);
-  }
-  
-  gSettings.windowWidth = size.w;
-  gSettings.windowHeight = size.h;
-}
-
 Size  Screen_GetSize()
 {
   Size size;
@@ -396,16 +388,6 @@ void Canvas_SetSize(Size size)
 {
   gCanvasSize.w = size.w;
   gCanvasSize.h = size.h;
-
-  if (gRenderer != NULL)
-  {
-    SDL_RenderSetLogicalSize(gRenderer, gCanvasSize.w, gCanvasSize.h);
-  }
-}
-
-Size  Canvas_GetSize()
-{
-  return gCanvasSize;
 }
 
 S32 Canvas_GetWidth()
@@ -416,6 +398,26 @@ S32 Canvas_GetWidth()
 S32 Canvas_GetHeight()
 {
   return gCanvasSize.h;
+}
+
+void Canvas_Set(U8 id)
+{
+  assert(id < RETRO_CANVAS_COUNT);
+  gCanvasTexture = gCanvasTextures[id];
+  SDL_SetRenderTarget(gRenderer, gCanvasTexture);
+}
+
+void Canvas_SetFlags(U8 id, U8 flags)
+{
+  assert(id < RETRO_CANVAS_COUNT);
+
+  gCanvasFlags[id] = flags;
+
+  if (flags & CNF_Blend)
+    SDL_SetTextureBlendMode(gCanvasTextures[id], SDL_BLENDMODE_BLEND);
+  else
+    SDL_SetTextureBlendMode(gCanvasTextures[id], SDL_BLENDMODE_NONE);
+
 }
 
 void Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle)
@@ -943,7 +945,6 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
 
   assert(imageData);
 
-
   SDL_Texture* texture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, width, height - 1);
 
   void* pixelsVoid;
@@ -1256,6 +1257,7 @@ void Restart()
 
 void Frame()
 {
+
   Timer_Start(&gCapTimer);
 
   gDeltaTime = Timer_GetTicks(&gDeltaTimer);
@@ -1323,12 +1325,30 @@ void Frame()
 
     // @TODO Axis
   }
+  
+  for (U8 i=0;i < RETRO_CANVAS_COUNT;i++)
+  {
+    if (gCanvasFlags[i] & CNF_Clear)
+    {
+      Canvas_Set(i);
+      Canvas_Clear();
+    }
+  }
 
-  Canvas_Clear();
+  Canvas_Set(0);
+  
   Step();
-  Canvas_Flip();
-  ++gCountedFrames;
+  SDL_SetRenderTarget(gRenderer, NULL);
 
+  for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+  {
+    SDL_RenderCopy(gRenderer, gCanvasTextures[i], NULL, NULL);
+  }
+
+  Canvas_Flip();
+  
+  ++gCountedFrames;
+  
   Timer_Start(&gDeltaTimer);
 }
 
@@ -1375,11 +1395,23 @@ int main(int argc, char **argv)
     SDL_WINDOW_SHOWN
   );
 
-  gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED);
+  gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
 
   Init(&gSettings);
 
-  Canvas_SetSize(Size_Make(RETRO_CANVAS_DEFAULT_WIDTH, RETRO_CANVAS_DEFAULT_HEIGHT));
+  gCanvasSize = Size_Make(RETRO_CANVAS_DEFAULT_WIDTH, RETRO_CANVAS_DEFAULT_HEIGHT);
+
+  for (U8 i=0;i < RETRO_CANVAS_COUNT;i++)
+  {
+    gCanvasTextures[i] = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_TARGET, gCanvasSize.w, gCanvasSize.h);
+    int flags = CNF_Clear;
+    if (i > 0)
+      flags |= CNF_Blend;
+
+    Canvas_SetFlags(i, flags);
+  }
+
+  Canvas_Set(0);
 
   gQuit = false;
 

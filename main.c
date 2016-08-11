@@ -62,6 +62,7 @@ void Start()
 
 void Step()
 {
+
   if (Input_GetActionDown(AC_UP))
     playerVelocity.y -= 1;
   else if (Input_GetActionDown(AC_DOWN))
@@ -117,6 +118,12 @@ void Step()
     }
   }
 
+  Canvas_Set(0);
+  player.x -= 10;
   Canvas_PlaceAnimated(&player, true);
+  player.x += 10;
+  Canvas_Set(1);
+  Canvas_PlaceAnimated(&player, true);
+
   Canvas_Debug(&FONT_NEOSANS);
 }

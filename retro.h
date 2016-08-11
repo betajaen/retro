@@ -60,6 +60,10 @@
 #define RETRO_MAX_ANIMATED_SPRITE_FRAMES 8
 #endif
 
+#ifndef RETRO_CANVAS_COUNT
+#define RETRO_CANVAS_COUNT 2
+#endif
+
 #define RETRO_UNUSED(X) (void)X
 #define RETRO_ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
@@ -237,17 +241,23 @@ void  Animation_LoadHorizontal(Animation* inAnimatedSprite, Bitmap* bitmap, U8 n
 
 void  Animation_LoadVertical(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
 
-void  Screen_SetSize(Size size);
-
 Size  Screen_GetSize();
-
-void  Canvas_SetSize(Size size);
-
-Size  Canvas_GetSize();
 
 S32   Canvas_GetWidth();
 
 S32   Canvas_GetHeight();
+
+void  Canvas_Set(U8 id);
+
+void  Canvas_Clear();
+
+typedef enum
+{
+  CNF_Clear      = 1,
+  CNF_Blend      = 2
+} CanvasFlags;
+
+void  Canvas_SetFlags(U8 id, U8 flags);
 
 void  Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle);
 
