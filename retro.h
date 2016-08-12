@@ -77,7 +77,7 @@
 #endif
 
 #ifndef RETRO_AUDIO_SAMPLES
-#define RETRO_AUDIO_SAMPLES 4096
+#define RETRO_AUDIO_SAMPLES 16384
 #endif 
 
 #define RETRO_UNUSED(X) (void)X
@@ -336,6 +336,10 @@ void  Sound_Load(Sound* sound, const char* name);
 void  Sound_Play(Sound* sound, U8 volume);
 
 void  Sound_Clear();
+
+void  Music_Play(const char* name);
+
+void  Music_Stop();
 
 void  Palette_Make(Palette* palette);
 

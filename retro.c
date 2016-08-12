@@ -9,6 +9,8 @@
 
 #define LODEPNG_NO_COMPILE_ENCODER
 #include "ref/lodepng.c"
+#include "ref/micromod.c"
+#include "ref/micromod_sdl.c"
 #include "SDL_main.h"
 #include "assert.h"
 
@@ -92,27 +94,31 @@ typedef struct Retro_SoundObject
   U8     volume;
 } SoundObject;
 
-SDL_Window*         gWindow;
-SDL_Renderer*       gRenderer;
-SDL_Texture*        gCanvasTexture;
-SDL_Texture*        gCanvasTextures[RETRO_CANVAS_COUNT];
-U8                  gCanvasFlags[RETRO_CANVAS_COUNT];
-U8                  gCanvasBackgroundColour[RETRO_CANVAS_COUNT];
-Settings            gSettings;
-Size                gCanvasSize;
-LinearAllocator     gArena;
-ScopeStack          gScopeStack[RETRO_ARENA_STACK_SIZE];
-U32                 gScopeStackIndex;
-char                gInputChar;
-InputCharState      gInputCharState;
-InputActionBinding  gInputActions[RETRO_MAX_INPUT_ACTIONS];
-bool                gQuit;
-Timer               gFpsTimer, gCapTimer, gDeltaTimer;
-U32                 gCountedFrames;
-U32                 gDeltaTime;
-float               gFps;
-SoundDevice         gSoundDevice;
-SoundObject         gSoundObject[RETRO_MAX_SOUND_OBJECTS];
+SDL_Window*           gWindow;
+SDL_Renderer*         gRenderer;
+SDL_Texture*          gCanvasTexture;
+SDL_Texture*          gCanvasTextures[RETRO_CANVAS_COUNT];
+U8                    gCanvasFlags[RETRO_CANVAS_COUNT];
+U8                    gCanvasBackgroundColour[RETRO_CANVAS_COUNT];
+Settings              gSettings;
+Size                  gCanvasSize;
+LinearAllocator       gArena;
+ScopeStack            gScopeStack[RETRO_ARENA_STACK_SIZE];
+U32                   gScopeStackIndex;
+char                  gInputChar;
+InputCharState        gInputCharState;
+InputActionBinding    gInputActions[RETRO_MAX_INPUT_ACTIONS];
+bool                  gQuit;
+Timer                 gFpsTimer, gCapTimer, gDeltaTimer;
+U32                   gCountedFrames;
+U32                   gDeltaTime;
+float                 gFps;
+SoundDevice           gSoundDevice;
+SoundObject           gSoundObject[RETRO_MAX_SOUND_OBJECTS];
+micromod_sdl_context* gMusicContext;
+#ifdef RETRO_BROWSER
+U8*                   gMusicFileData;
+#endif
 
 typedef union
 {
@@ -1003,9 +1009,90 @@ void  Sound_Clear()
   }
 }
 
+void Music_Play(const char* name)
+{
+  if (gMusicContext != NULL)
+  {
+    Music_Stop();
+  }
+
+  gMusicContext = malloc(sizeof(micromod_sdl_context));
+  memset(gMusicContext, 0, sizeof(micromod_sdl_context));
+
+  void* data = NULL;
+  U32 dataLength = 0;
+
+#ifdef RETRO_WINDOWS
+  data = Resource_Load(name, &dataLength);
+#else
+  RETRO_MAKE_BROWSER_PATH(name);
+  FILE* f = fopen(RETRO_BROWSER_PATH, "rb");
+  fseek(f, 0, SEEK_END);
+  dataLength = ftell(f);
+  fseek(f, 0, SEEK_SET);
+
+  gMusicFileData = malloc(dataLength);
+  fread(gMusicFileData, dataLength, 1, f);
+  fclose(f);
+
+  data = gMusicFileData;
+#endif
+
+  micromod_initialise(data, SAMPLING_FREQ * OVERSAMPLE);
+  print_module_info();
+  gMusicContext->samples_remaining = micromod_calculate_song_duration();
+
+}
+
+void Music_Stop()
+{
+  if (gMusicContext == NULL)
+  {
+    return;
+  }
+
+  free(gMusicContext);
+}
+
 void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
 {
   SDL_memset(stream, 0, streamLength);
+
+  if (gMusicContext != NULL)
+  {
+
+    // int uSize = (gSoundDevice.specification.format == AUDIO_S16 ? sizeof(short) : sizeof(float));
+
+    long count = 0;
+
+    if (gSoundDevice.specification.format == AUDIO_S16)
+      count = streamLength / 2;
+    else
+      count = streamLength / 4;
+    
+    if( gMusicContext->samples_remaining < count ) {
+      /* Clear output.*/
+      count = gMusicContext->samples_remaining;
+    }
+
+    if( count > 0 ) {
+      /* Get audio from replay.*/
+
+      memset( gMusicContext->mix_buffer, 0, count * NUM_CHANNELS * sizeof( short ) );
+      micromod_get_audio( gMusicContext->mix_buffer, count );
+      
+      if (gSoundDevice.specification.format == AUDIO_S16)
+        micromod_sdl_downsample( gMusicContext, gMusicContext->mix_buffer, (short *) stream, count );
+      else
+        micromod_sdl_downsample_float( gMusicContext, gMusicContext->mix_buffer, (float*) stream, count);
+      
+      gMusicContext->samples_remaining -= count;
+    }
+    else
+    {
+      Music_Stop();
+    }
+  }
 
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
@@ -1526,12 +1613,14 @@ int main(int argc, char **argv)
   memset(&gSoundObject, 0, sizeof(gSoundObject));
   memset(&gSoundDevice, 0, sizeof(SoundDevice));
 
+  gMusicContext = NULL;
+
   SDL_AudioSpec want, got;
   memset(&want, 0, sizeof(want));
   memset(&got, 0, sizeof(got));
 
   want.freq = RETRO_AUDIO_FREQUENCY;
-  want.format = AUDIO_F32;
+  want.format = AUDIO_S16;
   want.channels = RETRO_AUDIO_CHANNELS;
   want.samples = RETRO_AUDIO_SAMPLES;
   want.callback = Retro_SDL_SoundCallback;
@@ -1539,7 +1628,7 @@ int main(int argc, char **argv)
 
   if (SDL_OpenAudio(&want, &got) < 0)
   {
-    want.format = AUDIO_S16;
+    want.format = AUDIO_F32;
     if (SDL_OpenAudio(&want, &got) < 0)
     {
       printf("Sound Init Error: %s\n", SDL_GetError());
@@ -1554,6 +1643,11 @@ int main(int argc, char **argv)
 //  printf("samples %i, %i\n", want.samples, got.samples);
 //  printf("callback %p, %p\n", want.callback, got.callback);
 
+  gMusicContext = NULL;
+
+#ifdef RETRO_BROWSER
+  gMusicFileData = NULL;
+#endif
 
   gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
 

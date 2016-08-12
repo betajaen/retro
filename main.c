@@ -60,6 +60,8 @@ void Start()
 
   playerVelocity.x = 0;
   playerVelocity.y = 0;
+
+  Music_Play("origin.mod");
 }
 
 void Step()
