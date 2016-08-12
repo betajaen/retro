@@ -335,6 +335,18 @@ void  Canvas_DrawFilledRectangle(U8 Colour, Rect rect);
 
 void  Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...);
 
+typedef enum
+{
+  // 1
+  FP_Normal,
+  //  alpha + (k * beta)
+  FP_WaveH,
+  //  alpha + (k * beta)
+  FP_WaveV
+} FramePresentation;
+
+void  Canvas_SetPresentation(FramePresentation presentation, float alpha, float beta);
+
 void  AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y);
 
 void  AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* animatedSpriteObject, bool playing, bool loop);

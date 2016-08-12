@@ -113,6 +113,8 @@ U8*                   gMusicFileData;
 #endif
 Animation*            gAnimations[256];
 Sprite*               gSprites[256];
+FramePresentation     gFramePresentation;
+float                 gFrameAlpha, gFrameBeta;
 
 typedef union
 {
@@ -1033,6 +1035,13 @@ void Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...)
   Canvas_PrintStr(x, y, font, colour, gFmtScratch);
 }
 
+void Canvas_SetPresentation(FramePresentation presentation, float alpha, float beta)
+{
+  gFramePresentation = presentation;
+  gFrameAlpha = alpha;
+  gFrameBeta = beta;
+}
+
 void AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y)
 {
   assert(inAnimatedSpriteObject);
@@ -1716,12 +1725,81 @@ void Frame()
   Step();
   SDL_SetRenderTarget(gRenderer, NULL);
 
-  for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+  switch(gFramePresentation)
   {
-    if (gCanvasFlags[i] & CNF_Render)
+    case FP_Normal:
     {
-      SDL_RenderCopy(gRenderer, gCanvasTextures[i], NULL, NULL);
+      for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+      {
+        if (gCanvasFlags[i] & CNF_Render)
+        {
+          SDL_RenderCopy(gRenderer, gCanvasTextures[i], NULL, NULL);
+        }
+      }
     }
+    break;
+    case FP_WaveH:
+    {
+      U32 accuracy = 2;
+
+      for (U32 u=0;u < RETRO_WINDOW_DEFAULT_HEIGHT;u+=accuracy)
+      {
+        SDL_Rect src;
+        SDL_Rect dst;
+        src.x = 0;
+        src.y = u;
+        src.w = RETRO_CANVAS_DEFAULT_WIDTH;
+        src.h = accuracy;
+
+        dst = src;
+
+        float x0 = (float) u / (float) RETRO_WINDOW_DEFAULT_HEIGHT;
+        dst.x = (sin((gCountedFrames % 1000) * gFrameAlpha + x0 * 3.14f) * gFrameBeta);
+        dst.y = u * 2;
+        dst.w = RETRO_WINDOW_DEFAULT_WIDTH;
+        dst.h = accuracy * 2;
+
+        for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+        {
+          if (gCanvasFlags[i] & CNF_Render)
+          {
+            SDL_RenderCopy(gRenderer, gCanvasTextures[i], &src, &dst);
+          }
+        }
+      }
+    }
+    break;
+    case FP_WaveV:
+    {
+      U32 accuracy = 2;
+
+      for (U32 u=0;u < RETRO_WINDOW_DEFAULT_HEIGHT;u+=accuracy)
+      {
+        SDL_Rect src;
+        SDL_Rect dst;
+        src.x = u;
+        src.y = 0;
+        src.w = accuracy;
+        src.h = RETRO_CANVAS_DEFAULT_HEIGHT;
+
+        dst = src;
+
+        float y0 = (float) u / (float) RETRO_WINDOW_DEFAULT_HEIGHT;
+        dst.x = u * 2;
+        dst.y = (sin((gCountedFrames % 1000) * gFrameAlpha + y0 * 3.14f) * gFrameBeta);
+        dst.w = accuracy * 2;
+        dst.h = RETRO_WINDOW_DEFAULT_HEIGHT;
+
+        for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+        {
+          if (gCanvasFlags[i] & CNF_Render)
+          {
+            SDL_RenderCopy(gRenderer, gCanvasTextures[i], &src, &dst);
+          }
+        }
+      }
+    }
+    break;
   }
 
   Canvas_Flip();
@@ -1803,13 +1881,6 @@ int main(int argc, char **argv)
   }
 
   gSoundDevice.specification = got;
-//
-//  printf("freq %i, %i\n", want.freq, got.freq);
-//  printf("format %i, %i\n", want.format, got.format);
-//  printf("channels %i, %i\n", want.channels, got.channels);
-//  printf("samples %i, %i\n", want.samples, got.samples);
-//  printf("callback %p, %p\n", want.callback, got.callback);
-
   gMusicContext = NULL;
 
 #ifdef RETRO_BROWSER
@@ -1817,6 +1888,9 @@ int main(int argc, char **argv)
 #endif
 
   gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
+  gFramePresentation = FP_Normal;
+  gFrameAlpha = 0.16f;
+  gFrameBeta = 32.0f;
 
   Init(&gSettings);
 
