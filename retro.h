@@ -342,7 +342,9 @@ typedef enum
   //  alpha + (k * beta)
   FP_WaveH,
   //  alpha + (k * beta)
-  FP_WaveV
+  FP_WaveV,
+  //  w *= alpha, h *= beta, x -= w/2, y -= h/2
+  FP_Scale
 } FramePresentation;
 
 void  Canvas_SetPresentation(FramePresentation presentation, float alpha, float beta);
