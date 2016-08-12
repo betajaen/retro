@@ -941,7 +941,14 @@ void  Canvas_Debug(Font* font)
       soundObjectCount++;
   }
 
-  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount);
+  int music = -1;
+
+  if (gMusicContext != NULL)
+  {
+    music = (int) 100 - (((float) gMusicContext->samples_remaining / (float) gMusicContext->length) *100.0f);
+  }
+
+  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount, music);
 }
 
 void  Sound_Load(Sound* sound, const char* name)
@@ -1024,7 +1031,9 @@ void Music_Play(const char* name)
 
 #ifdef RETRO_WINDOWS
   data = Resource_Load(name, &dataLength);
-#else
+#endif
+
+#ifdef RETRO_BROWSER
   RETRO_MAKE_BROWSER_PATH(name);
   FILE* f = fopen(RETRO_BROWSER_PATH, "rb");
   fseek(f, 0, SEEK_END);
@@ -1041,6 +1050,7 @@ void Music_Play(const char* name)
   micromod_initialise(data, SAMPLING_FREQ * OVERSAMPLE);
   print_module_info();
   gMusicContext->samples_remaining = micromod_calculate_song_duration();
+  gMusicContext->length = gMusicContext->samples_remaining;
 
 }
 
@@ -1051,7 +1061,13 @@ void Music_Stop()
     return;
   }
 
+  #if RETRO_BROWSER
+    free(gMusicFileData);
+    gMusicFileData = NULL;
+  #endif
+
   free(gMusicContext);
+  gMusicContext = NULL;
 }
 
 void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
@@ -1090,7 +1106,7 @@ void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
     }
     else
     {
-      Music_Stop();
+      gMusicContext->samples_remaining = gMusicContext->length;
     }
   }
 

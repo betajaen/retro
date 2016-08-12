@@ -21,7 +21,7 @@
 // static SDL_sem *semaphore;
 
 typedef struct {
-  long samples_remaining;
+  long samples_remaining, length;
   short reverb_buffer[ REVERB_BUF_LEN ];
   short mix_buffer[ BUFFER_SAMPLES * NUM_CHANNELS * OVERSAMPLE ];
   long reverb_len, reverb_idx, filt_l, filt_r;

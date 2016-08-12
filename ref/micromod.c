@@ -552,6 +552,7 @@ long micromod_calculate_song_duration() {
 	long duration, song_end;
 	duration = 0;
 	if( num_channels > 0 ) {
+
 		micromod_set_position( 0 );
 		song_end = 0;
 		while( !song_end ) {

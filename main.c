@@ -15,7 +15,9 @@ typedef enum
   AC_DOWN,
   AC_LEFT,
   AC_ACTION,
-  AC_CANCEL
+  AC_CANCEL,
+  AC_MUSIC_ON,
+  AC_MUSIC_OFF,
 } Actions;
 
 
@@ -43,6 +45,8 @@ void Init(Settings* settings)
 
   Input_BindKey(SDL_SCANCODE_RETURN, AC_ACTION);
   Input_BindKey(SDL_SCANCODE_ESCAPE, AC_CANCEL);
+  Input_BindKey(SDL_SCANCODE_1, AC_MUSIC_ON);
+  Input_BindKey(SDL_SCANCODE_2, AC_MUSIC_OFF);
 
   Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
   Bitmap_Load("cave.png", &SPRITESHEET, 0);
@@ -67,9 +71,19 @@ void Start()
 void Step()
 {
 
-  if (Input_GetActionPressed(AC_ACTION))
+  if (Input_GetActionReleased(AC_ACTION))
   {
     Sound_Play(&SOUND_COIN, 128);
+  }
+
+  if (Input_GetActionReleased(AC_MUSIC_ON))
+  {
+    Music_Play("origin.mod");
+  }
+
+  if (Input_GetActionReleased(AC_MUSIC_OFF))
+  {
+    Music_Stop();
   }
 
   if (Input_GetActionDown(AC_UP))
