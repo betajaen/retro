@@ -51,19 +51,11 @@ void LinearAllocator_Make(LinearAllocator* allocator, U32 size)
   allocator->end = allocator->begin + size;
   allocator->current = allocator->begin;
 }
-struct Finaliser;
-struct Finaliser
-{
-  void (*fn)(void*);
-  void* mem;
-  struct Finaliser* head;
-};
 
 typedef struct
 {
   int                name;
-  U8*                offset;
-  struct Finaliser*  head;
+  U32                p;
 } ScopeStack;
 
 typedef struct
@@ -103,7 +95,7 @@ U8                    gCanvasBackgroundColour[RETRO_CANVAS_COUNT];
 Settings              gSettings;
 Size                  gCanvasSize;
 LinearAllocator       gArena;
-ScopeStack            gScopeStack[RETRO_ARENA_STACK_SIZE];
+ScopeStack            gScopeStack[256];
 U32                   gScopeStackIndex;
 char                  gInputChar;
 InputCharState        gInputCharState;
@@ -119,6 +111,8 @@ micromod_sdl_context* gMusicContext;
 #ifdef RETRO_BROWSER
 U8*                   gMusicFileData;
 #endif
+Animation*            gAnimations[256];
+Sprite*               gSprites[256];
 
 typedef union
 {
@@ -350,27 +344,73 @@ void Bitmap_Load(const char* name, Bitmap* outBitmap, U8 transparentIndex)
   outBitmap->imageData = imageData;
 }
 
+SpriteHandle SpriteHandle_Set(Sprite* sprite)
+{
+  for (U32 i=0;i < 256;i++)
+  {
+    if (gSprites[i] == NULL)
+    {
+      gSprites[i] = sprite;
+      return i;
+    }
+  }
+  assert(true);
+  return 0xFF;
+}
+
+Sprite* SpriteHandle_Get(SpriteHandle handle)
+{
+  return gSprites[handle];
+} 
+
 void Sprite_Make(Sprite* inSprite, Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h)
 {
   assert(bitmap);
+
+  SpriteHandle spriteHandle = SpriteHandle_Set(inSprite);
+  
+  inSprite->spriteHandle = spriteHandle;
   inSprite->bitmap = bitmap;
   inSprite->rect.x = x;
   inSprite->rect.y = y;
   inSprite->rect.w = w;
   inSprite->rect.h = h;
+
 }
 
-void Retro_Animation_Load(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight, S32 frameOffsetX, S32 frameOffsetY)
+AnimationHandle AnimationHandle_Set(Animation* animation)
+{
+  for (U32 i=0;i < 256;i++)
+  {
+    if (gAnimations[i] == NULL)
+    {
+      gAnimations[i] = animation;
+      return i;
+    }
+  }
+  assert(true);
+  return 0xFF;
+}
+
+Animation* AnimationHandle_Get(AnimationHandle handle)
+{
+  return gAnimations[handle];
+} 
+
+void Retro_Animation_Load(Animation* inAnimation, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight, S32 frameOffsetX, S32 frameOffsetY)
 {
   assert(numFrames < RETRO_MAX_ANIMATED_SPRITE_FRAMES);
-  assert(inAnimatedSprite);
+  assert(inAnimation);
   assert(bitmap);
 
-  inAnimatedSprite->bitmap = bitmap;
-  inAnimatedSprite->frameCount = numFrames;
-  inAnimatedSprite->frameLength = frameLengthMilliseconds;
-  inAnimatedSprite->w = frameWidth;
-  inAnimatedSprite->h = frameHeight;
+  AnimationHandle animationHandle = AnimationHandle_Set(inAnimation);
+
+  inAnimation->bitmap = bitmap;
+  inAnimation->frameCount = numFrames;
+  inAnimation->frameLength = frameLengthMilliseconds;
+  inAnimation->w = frameWidth;
+  inAnimation->h = frameHeight;
+  inAnimation->animationHandle = animationHandle;
 
   SDL_Rect frame;
   frame.x = originX;
@@ -380,7 +420,7 @@ void Retro_Animation_Load(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFra
 
   for(U8 i=0;i < numFrames;i++)
   {
-    inAnimatedSprite->frames[i] = frame;
+    inAnimation->frames[i] = frame;
     frame.x += frameOffsetX;
     frame.y += frameOffsetY;
   }
@@ -504,7 +544,9 @@ void Canvas_SplatFlip(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRecta
 void Canvas_Place(StaticSpriteObject* spriteObject)
 {
   assert(spriteObject);
-  Canvas_Splat2(spriteObject->sprite->bitmap, spriteObject->x, spriteObject->y, &spriteObject->sprite->rect);
+  Sprite* sprite = SpriteHandle_Get(spriteObject->spriteHandle);
+
+  Canvas_Splat2(sprite->bitmap, spriteObject->x, spriteObject->y, &sprite->rect);
 }
 
 void Canvas_Place2(Sprite* sprite, S32 x, S32 y)
@@ -515,6 +557,8 @@ void Canvas_Place2(Sprite* sprite, S32 x, S32 y)
 
 void Canvas_PlaceAnimated(AnimatedSpriteObject* spriteObject, bool updateTiming)
 {
+  Animation* animation = AnimationHandle_Get(spriteObject->animationHandle);
+
   if (updateTiming && (spriteObject->flags & SOF_Animation) != 0)
   {
     spriteObject->frameTime += gDeltaTime;
@@ -522,17 +566,18 @@ void Canvas_PlaceAnimated(AnimatedSpriteObject* spriteObject, bool updateTiming)
     if (spriteObject->frameTime >= 1000)
       spriteObject->frameTime = 0; // Prevent spiral out of control.
 
-    while(spriteObject->frameTime > spriteObject->animation->frameLength)
+
+    while(spriteObject->frameTime > animation->frameLength)
     {
       spriteObject->frameNumber++;
-      spriteObject->frameTime -= spriteObject->animation->frameLength;
+      spriteObject->frameTime -= animation->frameLength;
 
-      if (spriteObject->frameNumber >= spriteObject->animation->frameCount)
+      if (spriteObject->frameNumber >= animation->frameCount)
       {
         if (spriteObject->flags & SOF_AnimationOnce)
         {
           spriteObject->flags &= ~SOF_Animation;
-          spriteObject->frameNumber = spriteObject->animation->frameCount - 1; // Stop
+          spriteObject->frameNumber = animation->frameCount - 1; // Stop
           break;
         }
         else
@@ -543,8 +588,8 @@ void Canvas_PlaceAnimated(AnimatedSpriteObject* spriteObject, bool updateTiming)
     }
   }
 
-  assert(spriteObject->frameNumber < spriteObject->animation->frameCount);
-  Canvas_PlaceAnimated2(spriteObject->animation, spriteObject->x, spriteObject->y, spriteObject->frameNumber, spriteObject->flags & FF_Mask);
+  assert(spriteObject->frameNumber < animation->frameCount);
+  Canvas_PlaceAnimated2(animation, spriteObject->x, spriteObject->y, spriteObject->frameNumber, spriteObject->flags & FF_Mask);
 }
 
 void Canvas_PlaceAnimated2(Animation* animatedSprite, S32 x, S32 y, U8 frame, U8 flipFlags)
@@ -689,18 +734,150 @@ U8* Arena_Obtain(U32 size)
   return mem;
 }
 
-void Arena_Rewind(U8* mem)
+void Arena_RewindPtr(U8* mem)
 {
   assert(mem >= gArena.begin);
   assert(mem <= gArena.current);
   gArena.current = mem;
 }
 
+void Arena_RewindU32(U32 offset)
+{
+  assert(offset < RETRO_ARENA_SIZE);
+  gArena.current = gArena.begin + offset;
+}
+
+U32 Arena_Current()
+{
+  return gArena.current - gArena.begin;
+}
+
 int  Arena_PctSize()
 {
   U32 used = (gArena.current - gArena.begin);
-  float pct = ((float) used / (float) RETRO_ARENA_STACK_SIZE);
+  float pct = ((float) used / (float) RETRO_ARENA_SIZE);
   return (int) (pct * 100.0f);
+}
+
+typedef struct
+{
+  U8   header[4];
+  U32  size;
+  U32  scopeStackIndex;
+  U32  musicSamples;
+  char musicName[32];
+} Retro_ArenaSave;
+
+void Arena_Save(const char* filename)
+{
+  U32 size;
+  U8* mem = Arena_SaveToMem(&size);
+  FILE* f = fopen(filename, "wb");
+  fwrite(mem, size, 1, f);
+  fclose(f);
+  free(mem);
+}
+
+void Arena_Load(const char* filename, bool loadMusic)
+{
+  FILE* f = fopen(filename, "rb");
+  fseek(f, 0, SEEK_END);
+  int size = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  U8* mem = (U8*) malloc(size);
+  fread(mem, size, 1, f);
+  fclose(f);
+
+  Arena_LoadFromMem(mem, loadMusic);
+  free(mem);
+}
+
+U8* Retro_SaveToMem(U8* mem, void* obj, U32 size)
+{
+  memcpy(mem, obj, size);
+  mem += size;
+  return mem;
+}
+
+U8* Arena_SaveToMem(U32* outSize)
+{
+  U32 memSize = sizeof(Retro_ArenaSave);
+  memSize += (gScopeStackIndex + 1) * sizeof(ScopeStack);
+  memSize += Arena_Current();
+
+  *outSize = memSize;
+
+  printf("Size = %i\n", memSize);
+
+  U8* mem = (U8*) malloc(memSize);
+  U8* p = mem;
+
+  Retro_ArenaSave s;
+  s.header[0] = 'R';
+  s.header[1] = 'E';
+  s.header[2] = 'T';
+  s.header[3] = 'R';
+
+  s.scopeStackIndex = gScopeStackIndex;
+  s.size = (gArena.current - gArena.begin);
+  
+  if (gMusicContext != NULL)
+    s.musicSamples = gMusicContext->samples_remaining;
+  else
+    s.musicSamples = 0;
+
+  p = Retro_SaveToMem(p, &s, sizeof(Retro_ArenaSave));
+
+  for(U32 i=0;i < (s.scopeStackIndex + 1);i++)
+  {
+    //fwrite(&gScopeStack[i], sizeof(ScopeStack), 1,);
+    p = Retro_SaveToMem(p, &gScopeStack[i], sizeof(ScopeStack));
+  }
+
+  p = Retro_SaveToMem(p, gArena.begin, s.size);
+  return mem;
+}
+
+U8* Retro_ReadFromMem(U8* mem, void* obj, U32 size)
+{
+  memcpy(obj, mem, size);
+  mem += size;
+  return mem;
+}
+
+void Arena_LoadFromMem(U8* mem, bool loadMusic)
+{
+  U8* p = (U8*) mem;
+
+  Retro_ArenaSave l;
+
+  p = Retro_ReadFromMem(p, &l, sizeof(Retro_ArenaSave));
+
+  assert(l.header[0] == 'R');
+  assert(l.header[1] == 'E');
+  assert(l.header[2] == 'T');
+  assert(l.header[3] == 'R');
+  assert(l.size < RETRO_ARENA_SIZE);
+ 
+  gScopeStackIndex = l.scopeStackIndex;
+  
+  for(U32 i=0;i < l.scopeStackIndex + 1;i++)
+  {
+    //fread(&gScopeStack[i], sizeof(ScopeStack), 1, f);
+    p = Retro_ReadFromMem(p, &gScopeStack[i], sizeof(ScopeStack));
+  }
+
+  p = Retro_ReadFromMem(p, gArena.begin, l.size);
+
+  gArena.current = gArena.begin + l.size;
+
+
+  if (loadMusic && gMusicContext != NULL)
+  {
+    // gMusicContext->samples_remaining = l.musicSamples;
+    // micromod_set_position(l.musicSamples);
+  }
+
 }
 
 void Scope_Push(int name)
@@ -711,8 +888,7 @@ void Scope_Push(int name)
   ScopeStack* scope = &gScopeStack[gScopeStackIndex];
 
   scope->name = name;
-  scope->head = NULL;
-  scope->offset = gArena.current;
+  scope->p = Arena_Current();
 }
 
 int Scope_GetName()
@@ -724,43 +900,14 @@ int Scope_GetName()
 U8* Scope_Obtain(U32 size)
 {
   ScopeStack* scope = &gScopeStack[gScopeStackIndex];
-  assert(scope->offset + size < gArena.end); // Ensure can fit.
+  assert(scope->p + size < RETRO_ARENA_SIZE); // Ensure can fit.
   return Arena_Obtain(size);
-}
-
-U8* Scope_ObtainWithFinaliser(U32 size, void(*finaliserFn)(void*))
-{
-  ScopeStack* scope = &gScopeStack[gScopeStackIndex];
-  assert(scope->offset + size < gArena.end); // Ensure can fit.
-
-  U8* mem = Arena_Obtain(sizeof(struct Finaliser) + size);
-
-  struct Finaliser* finaliser = (struct Finaliser*) mem;
-  U8* userMem = mem + sizeof(struct Finaliser);
-  finaliser->head = scope->head;
-  scope->head = finaliser;
-  finaliser->fn = finaliserFn;
-  finaliser->mem = userMem;
-
-  return userMem;
 }
 
 void Scope_Rewind()
 {
   ScopeStack* scope = &gScopeStack[gScopeStackIndex];
-  
-  struct Finaliser* finaliser = scope->head;
-  while(finaliser)
-  {
-    if (finaliser->fn != NULL)
-    {
-      finaliser->fn(finaliser->mem);
-    }
-
-    finaliser = finaliser->head;
-  }
-
-  Arena_Rewind(scope->offset);
+  Arena_RewindU32(scope->p);
 }
 
 void Scope_Pop()
@@ -889,7 +1036,10 @@ void Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...)
 void AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y)
 {
   assert(inAnimatedSpriteObject);
-  inAnimatedSpriteObject->animation = animation;
+
+  AnimationHandle handle = AnimationHandle_Set(animation);
+
+  inAnimatedSpriteObject->animationHandle = handle;
   inAnimatedSpriteObject->flags = 0;
   inAnimatedSpriteObject->frameNumber = 0;
   inAnimatedSpriteObject->frameTime = 0;
@@ -918,7 +1068,7 @@ void AnimatedSpriteObject_SwitchAnimation(AnimatedSpriteObject* animatedSpriteOb
   assert(animatedSpriteObject);
   assert(newAnimation);
 
-  animatedSpriteObject->animation = newAnimation;
+  animatedSpriteObject->animationHandle = newAnimation->animationHandle;
   if (animate)
     animatedSpriteObject->flags |= SOF_Animation;
   else
@@ -1048,7 +1198,6 @@ void Music_Play(const char* name)
 #endif
 
   micromod_initialise(data, SAMPLING_FREQ * OVERSAMPLE);
-  print_module_info();
   gMusicContext->samples_remaining = micromod_calculate_song_duration();
   gMusicContext->length = gMusicContext->samples_remaining;
 
@@ -1061,7 +1210,7 @@ void Music_Stop()
     return;
   }
 
-  #if RETRO_BROWSER
+  #if defined(RETRO_BROWSER)
     free(gMusicFileData);
     gMusicFileData = NULL;
   #endif
@@ -1473,8 +1622,7 @@ void Restart()
   gArena.current = gArena.begin;
   
   gScopeStackIndex = 0;
-  gScopeStack[0].head = NULL;
-  gScopeStack[0].offset = gArena.current;
+  gScopeStack[0].p = 0;
   gScopeStack[0].name = 'INIT';
 
   Start();
@@ -1594,11 +1742,11 @@ int main(int argc, char **argv)
 
   SDL_Init(SDL_INIT_EVERYTHING);
 
-  gArena.begin = malloc(RETRO_ARENA_STACK_SIZE);
+  gArena.begin = malloc(RETRO_ARENA_SIZE);
   gArena.current = gArena.begin;
-  gArena.end = gArena.begin + RETRO_ARENA_STACK_SIZE;
+  gArena.end = gArena.begin + RETRO_ARENA_SIZE;
 
-  memset(gArena.begin, 0, RETRO_ARENA_STACK_SIZE);
+  memset(gArena.begin, 0, RETRO_ARENA_SIZE);
 
   gFmtScratch = malloc(1024);
 
@@ -1616,6 +1764,9 @@ int main(int argc, char **argv)
 
   for (U32 i=0;i < RETRO_ARRAY_COUNT(kDefaultPalette);i++)
     Palette_Add(&gSettings.palette, kDefaultPalette[i]);
+
+  memset(gAnimations, 0, 256 * sizeof(Animation*));
+  memset(gSprites, 0, 256 * sizeof(Sprite*));
 
   gWindow = SDL_CreateWindow( 
     RETRO_WINDOW_CAPTION,

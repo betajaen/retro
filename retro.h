@@ -41,11 +41,7 @@
 #endif
 
 #ifndef RETRO_ARENA_SIZE
-#define RETRO_ARENA_SIZE 512
-#endif
-
-#ifndef RETRO_ARENA_STACK_SIZE
-#define RETRO_ARENA_STACK_SIZE Kilobytes(512)
+#define RETRO_ARENA_SIZE Kilobytes(1)
 #endif
 
 #ifndef RETRO_MAX_INPUT_ACTIONS
@@ -100,6 +96,9 @@ typedef double   F64;
 #define Min(X, Y) (X < Y ? X : Y)
 #define Max(X, Y) (X > Y ? X : Y)
 
+typedef U8 SpriteHandle;
+typedef U8 AnimationHandle;
+
 typedef struct
 {
   SDL_Texture*  texture;
@@ -126,15 +125,17 @@ typedef struct
 {
   Bitmap*  bitmap;
   SDL_Rect rect;
+  SpriteHandle spriteHandle;
 } Sprite;
 
 typedef struct
 {
-  Bitmap*  bitmap;
-  U8       frameCount;
-  U8       w, h;
-  U16      frameLength;
-  SDL_Rect frames[RETRO_MAX_ANIMATED_SPRITE_FRAMES];
+  Bitmap*         bitmap;
+  U8              frameCount;
+  U8              w, h;
+  U16             frameLength;
+  AnimationHandle animationHandle;
+  SDL_Rect        frames[RETRO_MAX_ANIMATED_SPRITE_FRAMES];
 } Animation;
 
 typedef enum
@@ -151,16 +152,17 @@ typedef enum
 
 typedef struct
 {
-  Sprite* sprite;
-  S32     x, y;
-  S8      flags;
+  S32  x, y;
+  S8   flags;
+  U8   spriteHandle;
 } StaticSpriteObject;
 
 typedef struct
 {
-  Animation* animation;
   S32        x, y;
+  U8         w, h;
   U8         frameNumber, flags;
+  U8         animationHandle;
   U16        frameTime;
 } AnimatedSpriteObject;
 
@@ -231,17 +233,21 @@ typedef struct
 
 Size Size_Make(U32 w, U32 h);
 
+void Arena_Save(const char* filename);
+
+void Arena_Load(const char* filename, bool loadMusic);
+
+U8* Arena_SaveToMem(U32* size);
+
+void Arena_LoadFromMem(U8* mem, bool loadMusic);
+
 void Scope_Push(int name);
 
 int  Scope_GetName();
 
 U8* Scope_Obtain(U32 size);
 
-U8* Scope_ObtainWithFinaliser(U32 size, void(*finaliserFn)(void*));
-
 #define Scope_New(T) ((T*) Scope_Obtain(sizeof(T)))
-
-#define Scope_NewWithFinaliser(T, FINALISER) ((T*) Scope_ObtainWithFinaliser(sizeof(T), FINALISER))
 
 void Scope_Rewind();
 
@@ -260,9 +266,13 @@ void  Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset);
 
 void  Sprite_Make(Sprite* inSprite, Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
 
+Sprite* SpriteHandle_Get(SpriteHandle id);
+
 void  Animation_LoadHorizontal(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
 
 void  Animation_LoadVertical(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+
+Animation* AnimationHandle_Get(AnimationHandle id);
 
 Size  Screen_GetSize();
 

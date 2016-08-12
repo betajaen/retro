@@ -18,6 +18,8 @@ typedef enum
   AC_CANCEL,
   AC_MUSIC_ON,
   AC_MUSIC_OFF,
+  AC_ARENA_LOAD,
+  AC_ARENA_SAVE,
 } Actions;
 
 
@@ -27,8 +29,13 @@ typedef enum
   PF_Walking
 } PlayerState;
 
-AnimatedSpriteObject player;
-Point playerVelocity;
+typedef struct
+{
+  AnimatedSpriteObject player;
+  Point velocity;
+} GameState;
+
+GameState* state;
 
 void Init(Settings* settings)
 {
@@ -47,23 +54,27 @@ void Init(Settings* settings)
   Input_BindKey(SDL_SCANCODE_ESCAPE, AC_CANCEL);
   Input_BindKey(SDL_SCANCODE_1, AC_MUSIC_ON);
   Input_BindKey(SDL_SCANCODE_2, AC_MUSIC_OFF);
+  Input_BindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
+  Input_BindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
 
   Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
   Bitmap_Load("cave.png", &SPRITESHEET, 0);
 
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_IDLE, &SPRITESHEET, 1, 100, 0, 80, 16, 16);
-  Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_WALK, &SPRITESHEET, 4, 120,  0, 80, 16, 16);
+  Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_WALK, &SPRITESHEET, 4, 120, 0, 80, 16, 16);
 
   Sound_Load(&SOUND_COIN, "coin.wav");
 }
 
 void Start()
 {
-  AnimatedSpriteObject_Make(&player, &ANIMATEDSPRITE_QUOTE_WALK, Canvas_GetWidth() / 2, Canvas_GetHeight() / 2);
-  AnimatedSpriteObject_PlayAnimation(&player, true, true);
+  state = Scope_New(GameState);
 
-  playerVelocity.x = 0;
-  playerVelocity.y = 0;
+  AnimatedSpriteObject_Make(&state->player, &ANIMATEDSPRITE_QUOTE_WALK, Canvas_GetWidth() / 2, Canvas_GetHeight() / 2);
+  AnimatedSpriteObject_PlayAnimation(&state->player, true, true);
+
+  state->velocity.x = 0;
+  state->velocity.y = 0;
 
   Music_Play("origin.mod");
 }
@@ -86,67 +97,77 @@ void Step()
     Music_Stop();
   }
 
+  if (Input_GetActionReleased(AC_ARENA_SAVE))
+  {
+    Arena_Save("arena.raw");
+  }
+
+  if (Input_GetActionReleased(AC_ARENA_LOAD))
+  {
+    Arena_Load("arena.raw", true);
+  }
+
   if (Input_GetActionDown(AC_UP))
-    playerVelocity.y -= 1;
+    state->velocity.y -= 1;
   else if (Input_GetActionDown(AC_DOWN))
-    playerVelocity.y += 1;
+    state->velocity.y += 1;
 
   if (Input_GetActionDown(AC_LEFT))
-    playerVelocity.x--;
+    state->velocity.x--;
   else if (Input_GetActionDown(AC_RIGHT))
-    playerVelocity.x++;
+    state->velocity.x++;
   else
   {
-    if (playerVelocity.x < 0)
-      playerVelocity.x++;
-    else if (playerVelocity.x > 0)
-      playerVelocity.x--;
+    if (state->velocity.x < 0)
+      state->velocity.x++;
+    else if (state->velocity.x > 0)
+      state->velocity.x--;
   }
 
-  if (playerVelocity.x < -8)
-    playerVelocity.x = -8;
-  else if (playerVelocity.x > 8)
-    playerVelocity.x = 8;
+  if (state->velocity.x < -8)
+    state->velocity.x = -8;
+  else if (state->velocity.x > 8)
+    state->velocity.x = 8;
 
-  player.x += playerVelocity.x;
+  state->player.x += state->velocity.x;
 
-  if (playerVelocity.x > 0)
-    player.flags &= ~SOF_FlipX;
-  else if (playerVelocity.x < 0)
-    player.flags |= SOF_FlipX;
+  if (state->velocity.x > 0)
+    state->player.flags &= ~SOF_FlipX;
+  else if (state->velocity.x < 0)
+    state->player.flags |= SOF_FlipX;
 
-  if (player.x < 0)
+  if (state->player.x < 0)
   {
-    player.x = 0;
-    playerVelocity.x = 0;
+    state->player.x = 0;
+    state->velocity.x = 0;
   }
-  else if (player.x + player.animation->w > Canvas_GetWidth())
+  else if (state->player.x + state->player.w > Canvas_GetWidth())
   {
-    player.x = Canvas_GetWidth() - player.animation->w;
-    playerVelocity.x = 0;
+    state->player.x = Canvas_GetWidth() - state->player.w;
+    state->velocity.x = 0;
   }
 
-  if (playerVelocity.x != 0)
+  if (state->velocity.x != 0)
   {
-    if (player.animation == &ANIMATEDSPRITE_QUOTE_IDLE)
+    if (state->player.animationHandle == ANIMATEDSPRITE_QUOTE_IDLE.animationHandle)
     {
-      AnimatedSpriteObject_SwitchAnimation(&player, &ANIMATEDSPRITE_QUOTE_WALK, true);
+      AnimatedSpriteObject_SwitchAnimation(&state->player, &ANIMATEDSPRITE_QUOTE_WALK, true);
     }
   }
   else
   {
-    if (player.animation == &ANIMATEDSPRITE_QUOTE_WALK)
+    if (state->player.animationHandle == ANIMATEDSPRITE_QUOTE_WALK.animationHandle)
     {
-      AnimatedSpriteObject_SwitchAnimation(&player, &ANIMATEDSPRITE_QUOTE_IDLE, false);
+      AnimatedSpriteObject_SwitchAnimation(&state->player, &ANIMATEDSPRITE_QUOTE_IDLE, false);
     }
   }
 
   Canvas_Set(0);
-  player.x -= 10;
-  Canvas_PlaceAnimated(&player, true);
-  player.x += 10;
+  state->player.x -= 10;
+  Canvas_PlaceAnimated(&state->player, true);
+  state->player.x += 10;
   Canvas_Set(1);
-  Canvas_PlaceAnimated(&player, true);
+  Canvas_PlaceAnimated(&state->player, true);
 
   Canvas_Debug(&FONT_NEOSANS);
 }

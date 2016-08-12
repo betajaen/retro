@@ -152,7 +152,7 @@ static void print_module_info() {
   char string[ 23 ];
   for( inst = 0; inst < 16; inst++ ) {
     micromod_get_string( inst, string );
-    printf( "%02i - %-22s\n", inst, string );
+    printf( "%02i - %-22s", inst, string );
     micromod_get_string( inst + 16, string );
     printf( "%02i - %-22s\n", inst + 16, string );
   }
