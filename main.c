@@ -59,13 +59,13 @@ void Init(Settings* settings)
   input.bindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
   input.bindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
 
-  Retro_Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
+  font.load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
   Bitmap_Load("cave.png", &SPRITESHEET, 0);
 
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_IDLE, &SPRITESHEET, 1, 100, 0, 80, 16, 16);
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_WALK, &SPRITESHEET, 4, 120, 0, 80, 16, 16);
 
-  Sound_Load(&SOUND_COIN, "coin.wav");
+  audio.loadSound("coin.wav", &SOUND_COIN);
 }
 
 void Start()
@@ -81,7 +81,7 @@ void Start()
   timer.make(&TIMER);
   timer.start(&TIMER);
 
-  Music_Play("origin.mod");
+  Retro_Audio_PlayMusic("origin.mod");
 }
 
 void Step()
@@ -89,17 +89,17 @@ void Step()
 
   if (input.released(AC_ACTION))
   {
-    Sound_Play(&SOUND_COIN, 128);
+    audio.playSound(&SOUND_COIN, 128);
   }
 
   if (input.released(AC_MUSIC_ON))
   {
-    Music_Play("origin.mod");
+    audio.playMusic("origin.mod");
   }
 
   if (input.released(AC_MUSIC_OFF))
   {
-    Music_Stop();
+    audio.stopMusic();
   }
 
   if (input.released(AC_ARENA_SAVE))

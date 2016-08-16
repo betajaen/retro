@@ -363,15 +363,49 @@ void  AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* animatedSpriteObj
 
 void  AnimatedSpriteObject_SwitchAnimation(AnimatedSpriteObject* animatedSpriteObject, Animation* newAnimation, bool animate);
 
-void  Sound_Load(Sound* sound, const char* name);
 
-void  Sound_Play(Sound* sound, U8 volume);
 
-void  Sound_Clear();
 
-void  Music_Play(const char* name);
+void  Retro_Audio_LoadSound(const char* name, Sound* sound);
 
-void  Music_Stop();
+void  Retro_Audio_PlaySound(Sound* sound, U8 volume);
+
+void  Retro_Audio_ClearSounds();
+
+void  Retro_Audio_PlayMusic(const char* name);
+
+void  Retro_Audio_StopMusic();
+
+
+#if RETRO_NAMESPACES == 1
+  const struct RETRO_Audio
+  {
+    void (*loadSound)(const char* name, Sound* inSound);
+    void (*playSound)(Sound* inSound, U8 volume);
+    void (*clearSounds)();
+    void (*playMusic)(const char* name);
+    void (*stopMusic)();
+  }
+  #ifdef RETRO_AUDIO_IS
+    RETRO_AUDIO_IS
+  #else
+    audio
+  #endif
+  = {
+    .loadSound   = Retro_Audio_LoadSound,
+    .playSound   = Retro_Audio_PlaySound,
+    .clearSounds = Retro_Audio_ClearSounds,
+    .playMusic   = Retro_Audio_PlayMusic,
+    .stopMusic   = Retro_Audio_StopMusic
+  };
+#elif RETRO_NAMESPACES == 0
+#define    Audio_LoadSound(CONST_CHAR_name, SOUND)        Retro_Audio_LoadSound(CONST_CHAR_name, SOUND)
+#define    Audio_PlaySound(SOUND, U8_volume)              Retro_Audio_PlaySound(SOUND, U8_volume)
+#define    Audio_ClearSounds()                            Retro_Audio_ClearSounds()
+#define    Audio_PlayMusic(CONST_CHAR_name)               Retro_Audio_PlayMusic(CONST_CHAR_name)
+#define    Audio_StopMusic()                              Retro_Audio_StopMusic()
+#endif
+
 
 void  Retro_Palette_Load(const char* name);
 
@@ -407,7 +441,7 @@ Colour Retro_Palette_Get(U8 index);
     .has     = Retro_Palette_Has,
     .get     = Retro_Palette_Get
   };
-#else
+#elif RETRO_NAMESPACES == 0
 #   define  Palette_Load(CONST_CHAR_name)             Retro_Palette_Load(CONST_CHAR_name)
 #   define  Palette_Add(COLOUR_colour)                Retro_Palette_Add(COLOUR_colour)
 #   define  Palette_AddRGB(U32_argb)                  Retro_Palette_AddARGB(U32_argb)
@@ -481,7 +515,7 @@ S16   Retro_Input_DeltaAxis(int action);
     .axis      = Retro_Input_Axis,
     .deltaAxis = Retro_Input_DeltaAxis
   };
-#else
+#elif RETRO_NAMESPACES == 0
 #   define Input_TextInput(CHAR_str, U32_capacity)         Retro_Input_TextInput(CHAR_str, U32_capacity)
 #   define Input_BindKey(INT_sdlscancode, INT_action)      Retro_Input_BindKey(INT_sdlscancode, INT_action)
 #   define Input_BindAxis(INT_axis, INT_action)            Retro_Input_BindAxis(INT_axis, INT_action)
@@ -534,7 +568,7 @@ bool  Retro_Timer_Paused(Timer* timer);
     .started = Retro_Timer_Started,
     .paused  = Retro_Timer_Paused,
   };
-#else
+#elif RETRO_NAMESPACES == 0
 #   define Timer_Make(TIMER)      Retro_TimerMake(TIMER)
 #   define Timer_Start(TIMER)     Retro_Timer_Start(TIMER)
 #   define Timer_Stop(TIMER)      Retro_Timer_Stop(TIMER)

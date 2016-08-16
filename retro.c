@@ -1131,7 +1131,7 @@ void  Canvas_Debug(Font* font)
   Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount, music);
 }
 
-void  Sound_Load(Sound* sound, const char* name)
+void  Retro_Audio_LoadSound(const char* name, Sound* sound)
 {
 
   #ifdef RETRO_WINDOWS
@@ -1168,7 +1168,7 @@ void  Sound_Load(Sound* sound, const char* name)
 
 }
 
-void  Sound_Play(Sound* sound, U8 volume)
+void  Retro_Audio_PlaySound(Sound* sound, U8 volume)
 {
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
@@ -1184,7 +1184,7 @@ void  Sound_Play(Sound* sound, U8 volume)
   }
 }
 
-void  Sound_Clear()
+void  Retro_Audio_ClearSounds()
 {
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
@@ -1196,11 +1196,11 @@ void  Sound_Clear()
   }
 }
 
-void Music_Play(const char* name)
+void Retro_Audio_PlayMusic(const char* name)
 {
   if (gMusicContext != NULL)
   {
-    Music_Stop();
+    Retro_Audio_StopMusic();
   }
 
   gMusicContext = malloc(sizeof(micromod_sdl_context));
@@ -1233,7 +1233,7 @@ void Music_Play(const char* name)
 
 }
 
-void Music_Stop()
+void Retro_Audio_StopMusic()
 {
   if (gMusicContext == NULL)
   {
