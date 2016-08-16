@@ -56,6 +56,14 @@
 #define RETRO_MAX_ANIMATED_SPRITE_FRAMES 8
 #endif
 
+#ifndef RETRO_MAX_ANIMATIONS
+#define RETRO_MAX_ANIMATIONS 256
+#endif
+
+#ifndef RETRO_MAX_SPRITES
+#define RETRO_MAX_SPRITES 256
+#endif
+
 #ifndef RETRO_CANVAS_COUNT
 #define RETRO_CANVAS_COUNT 2
 #endif
@@ -92,6 +100,10 @@
 
 #ifndef RETRO_RESOURCES_NAMESPACE_NAME
 #define RETRO_RESOURCES_NAMESPACE_NAME resources
+#endif
+
+#ifndef RETRO_SPRITES_NAMESPACE_NAME
+#define RETRO_SPRITES_NAMESPACE_NAME sprites
 #endif
 
 #ifndef RETRO_CANVAS_NAMESPACE_NAME
@@ -141,11 +153,13 @@ typedef int32_t  S32;
 typedef float    F32;
 typedef double   F64;
 
-#define Min(X, Y) (X < Y ? X : Y)
-#define Max(X, Y) (X > Y ? X : Y)
+#define Retro_Min(X, Y) (X < Y ? X : Y)
 
-typedef U8 SpriteHandle;
-typedef U8 AnimationHandle;
+#define Retro_Max(X, Y) (X > Y ? X : Y)
+
+typedef U16 SpriteHandle;
+typedef U16 AnimationHandle;
+typedef U8  BitmapHandle;
 
 typedef struct
 {
@@ -168,23 +182,6 @@ typedef struct
 {
   S32 x, y, w, h;
 } Rect;
-
-typedef struct
-{
-  Bitmap*  bitmap;
-  SDL_Rect rect;
-  SpriteHandle spriteHandle;
-} Sprite;
-
-typedef struct
-{
-  Bitmap*         bitmap;
-  U8              frameCount;
-  U8              w, h;
-  U16             frameLength;
-  AnimationHandle animationHandle;
-  Rect            frames[RETRO_MAX_ANIMATED_SPRITE_FRAMES];
-} Animation;
 
 typedef enum
 {
@@ -269,6 +266,7 @@ Size Size_Make(U32 w, U32 h);
 
 
 
+
 void Retro_Arena_LoadFromMemory(U8* mem, bool loadMusic);
 
 void Retro_Arena_Load(const char* filename, bool loadMusic);
@@ -346,6 +344,11 @@ RETRO_SCOPE_NAMESPACE_NAME
 
 
 
+
+
+
+
+
 // Loads a palette from the colours given in a image file.
 void  Retro_Resources_LoadPalette(const char* name);
 
@@ -382,15 +385,53 @@ RETRO_RESOURCES_NAMESPACE_NAME
 
 
 
-void  Sprite_Make(Sprite* inSprite, Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
 
-Sprite* SpriteHandle_Get(SpriteHandle id);
 
-void  Animation_LoadHorizontal(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
 
-void  Animation_LoadVertical(Animation* inAnimatedSprite, Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+SpriteHandle Retro_Sprites_LoadSprite(Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
 
-Animation* AnimationHandle_Get(AnimationHandle id);
+AnimationHandle Retro_Sprites_LoadAnimationH(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+
+AnimationHandle Retro_Sprites_LoadAnimationV(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+
+void  Retro_Sprites_NewAnimationObject(AnimationObject* inAnimatedSpriteObject, AnimationHandle animation, S32 x, S32 y);
+
+void  Retro_Sprites_PlayAnimationObject(AnimationObject* animatedSpriteObject, bool playing, bool loop);
+
+void  Retro_Sprites_SetAnimationObject(AnimationObject* animatedSpriteObject, AnimationHandle newAnimation, bool animate);
+
+
+#if RETRO_NAMESPACES == 1
+const struct RETRO_Sprites
+{
+  SpriteHandle (*loadSprite)(Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
+  AnimationHandle (*loadAnimationH)(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+  AnimationHandle (*loadAnimationV)(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+  void (*newAnimation)(AnimationObject* inAnimatedSpriteObject, AnimationHandle animation, S32 x, S32 y);
+  void (*playAnimation)(AnimationObject* animatedSpriteObject, bool playing, bool loop);
+  void (*setAnimation)(AnimationObject* animatedSpriteObject, AnimationHandle newAnimation, bool animate);
+}
+RETRO_SPRITES_NAMESPACE_NAME
+= {
+  .loadSprite          = Retro_Sprites_LoadSprite,
+  .loadAnimationH      = Retro_Sprites_LoadAnimationH,
+  .loadAnimationV      = Retro_Sprites_LoadAnimationV,
+  .newAnimation = Retro_Sprites_NewAnimationObject,
+  .playAnimation = Retro_Sprites_PlayAnimationObject,
+  .setAnimation  = Retro_Sprites_SetAnimationObject
+};
+#elif RETRO_NAMESPACES == 0
+#define Sprites_LoadSprite              Retro_Sprites_LoadSprite
+#define Sprites_LoadAnimationH          Retro_Sprites_LoadAnimationH
+#define Sprites_LoadAnimationV          Retro_Sprites_LoadAnimationV
+#define Sprites_MakeAnimationObject     Retro_Sprites_MakeAnimationObject
+#define Sprites_PlayAnimationObject     Retro_Sprites_PlayAnimationObject
+#define Sprites_SetAnimationObject      Retro_Sprites_SetAnimationObject
+#endif
+
+
+
+
 
 
 
@@ -461,7 +502,7 @@ void  Retro_Canvas_Printf(S32 x, S32 y, Font* font, U8 colour, const char* fmt, 
 #if RETRO_NAMESPACES == 1
 const struct RETRO_Canvas
 {
-  Size size;
+  S32  width, height;
   U32  count;
   
   void (*use)(U8 canvasIndex);
@@ -481,7 +522,8 @@ const struct RETRO_Canvas
 }
 RETRO_CANVAS_NAMESPACE_NAME
 = {
-  .size          = { RETRO_CANVAS_DEFAULT_WIDTH, RETRO_CANVAS_DEFAULT_HEIGHT },
+  .width         = RETRO_CANVAS_DEFAULT_WIDTH, 
+  .height        = RETRO_CANVAS_DEFAULT_HEIGHT,
   .count         = RETRO_CANVAS_COUNT,
   .use           = Retro_Canvas_Use,
   .flags         = Retro_Canvas_Flags,
@@ -516,11 +558,13 @@ RETRO_CANVAS_NAMESPACE_NAME
 #endif
 
 
-void  AnimatedSpriteObject_Make(AnimationObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y);
 
-void  AnimatedSpriteObject_PlayAnimation(AnimationObject* animatedSpriteObject, bool playing, bool loop);
 
-void  AnimatedSpriteObject_SwitchAnimation(AnimationObject* animatedSpriteObject, Animation* newAnimation, bool animate);
+
+
+
+
+
 
 void  Retro_Audio_PlaySound(Sound* sound, U8 volume);
 
@@ -632,6 +676,14 @@ Colour Retro_Palette_Get(U8 index);
 #   define  Palette_Get(U8_index)                     Retro_Palette_Get(U8_index)
 #endif
 
+
+
+
+
+
+
+
+
 int   Retro_Input_TextInput(char* str, U32 capacity);
 
 void  Retro_Input_BindKey(int sdl_scancode, int action);
@@ -702,6 +754,17 @@ S16   Retro_Input_DeltaAxis(int action);
 
 #endif
 
+
+
+
+
+
+
+
+
+
+
+
 void  Retro_Timer_Make(Timer* timer);
 
 void  Retro_Timer_Start(Timer* timer);
@@ -754,6 +817,10 @@ bool  Retro_Timer_Paused(Timer* timer);
 #   define Timer_Started(TIMER)   Retro_Timer_Started(TIMER)
 #   define Timer_Paused(TIMER)    Retro_Timer_Paused(TIMER)
 #endif
+
+
+
+
 
 void  Init();
 

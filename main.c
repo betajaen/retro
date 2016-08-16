@@ -4,10 +4,11 @@
 
 static Font           FONT_NEOSANS;
 static Bitmap         SPRITESHEET;
-static Animation      ANIMATEDSPRITE_QUOTE_IDLE;
-static Animation      ANIMATEDSPRITE_QUOTE_WALK;
+static AnimationHandle      ANIMATEDSPRITE_QUOTE_IDLE;
+static AnimationHandle      ANIMATEDSPRITE_QUOTE_WALK;
 static Sound          SOUND_COIN;
 static Timer          TIMER;
+
 
 
 typedef enum 
@@ -41,7 +42,6 @@ GameState* state;
 
 void Init()
 {
-  // resources.loadPalette("palette.png");
   resources.loadBitmap("cave.png", &SPRITESHEET, 0);
   resources.loadSound("coin.wav", &SOUND_COIN);
   resources.loadFont("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
@@ -57,17 +57,16 @@ void Init()
   input.bindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
   input.bindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
 
-  Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_IDLE, &SPRITESHEET, 1, 100, 0, 80, 16, 16);
-  Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_WALK, &SPRITESHEET, 4, 120, 0, 80, 16, 16);
-
+  ANIMATEDSPRITE_QUOTE_IDLE = sprites.loadAnimationH(&SPRITESHEET, 1, 100, 0, 80, 16, 16);
+  ANIMATEDSPRITE_QUOTE_WALK = sprites.loadAnimationH(&SPRITESHEET, 4, 120, 0, 80, 16, 16);
 }
 
 void Start()
 {
   state = Retro_Scope_New(GameState);
 
-  AnimatedSpriteObject_Make(&state->player, &ANIMATEDSPRITE_QUOTE_WALK, gSettings.canvasWidth / 2, gSettings.canvasHeight / 2);
-  AnimatedSpriteObject_PlayAnimation(&state->player, true, true);
+  sprites.newAnimation(&state->player, ANIMATEDSPRITE_QUOTE_WALK, canvas.width / 2, canvas.height / 2);
+  sprites.playAnimation(&state->player, true, true);
 
   state->velocity.x = 0;
   state->velocity.y = 0;
@@ -140,24 +139,24 @@ void Step()
     state->player.x = 0;
     state->velocity.x = 0;
   }
-  else if (state->player.x + state->player.w > gSettings.canvasWidth)
+  else if (state->player.x + state->player.w > canvas.width)
   {
-    state->player.x = gSettings.canvasWidth - state->player.w;
+    state->player.x = canvas.width - state->player.w;
     state->velocity.x = 0;
   }
 
   if (state->velocity.x != 0)
   {
-    if (state->player.animationHandle == ANIMATEDSPRITE_QUOTE_IDLE.animationHandle)
+    if (state->player.animationHandle == ANIMATEDSPRITE_QUOTE_IDLE)
     {
-      AnimatedSpriteObject_SwitchAnimation(&state->player, &ANIMATEDSPRITE_QUOTE_WALK, true);
+      sprites.setAnimation(&state->player, ANIMATEDSPRITE_QUOTE_WALK, true);
     }
   }
   else
   {
-    if (state->player.animationHandle == ANIMATEDSPRITE_QUOTE_WALK.animationHandle)
+    if (state->player.animationHandle == ANIMATEDSPRITE_QUOTE_WALK)
     {
-      AnimatedSpriteObject_SwitchAnimation(&state->player, &ANIMATEDSPRITE_QUOTE_IDLE, false);
+      sprites.setAnimation(&state->player, ANIMATEDSPRITE_QUOTE_IDLE, false);
     }
   }
 
@@ -173,4 +172,5 @@ void Step()
   canvas.printf(10, 10, &FONT_NEOSANS, palette.peach, "%i", ms);
 
   Retro_Debug(&FONT_NEOSANS);
+
 }
