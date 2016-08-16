@@ -741,17 +741,17 @@ typedef struct
   char musicName[32];
 } Retro_ArenaSave;
 
-void Arena_Save(const char* filename)
+void Retro_Arena_Save(const char* filename)
 {
   U32 size;
-  U8* mem = Arena_SaveToMem(&size);
+  U8* mem = Retro_Arena_SaveToMemory(&size);
   FILE* f = fopen(filename, "wb");
   fwrite(mem, size, 1, f);
   fclose(f);
   free(mem);
 }
 
-void Arena_Load(const char* filename, bool loadMusic)
+void Retro_Arena_Load(const char* filename, bool loadMusic)
 {
   FILE* f = fopen(filename, "rb");
   fseek(f, 0, SEEK_END);
@@ -761,7 +761,7 @@ void Arena_Load(const char* filename, bool loadMusic)
   fread(mem, size, 1, f);
   fclose(f);
 
-  Arena_LoadFromMem(mem, loadMusic);
+  Retro_Arena_LoadFromMemory(mem, loadMusic);
   free(mem);
 }
 
@@ -772,7 +772,7 @@ U8* Retro_SaveToMem(U8* mem, void* obj, U32 size)
   return mem;
 }
 
-U8* Arena_SaveToMem(U32* outSize)
+U8* Retro_Arena_SaveToMemory(U32* outSize)
 {
   U32 memSize = sizeof(Retro_ArenaSave);
   memSize += (gScopeStackIndex + 1) * sizeof(ScopeStack);
@@ -818,7 +818,7 @@ U8* Retro_ReadFromMem(U8* mem, void* obj, U32 size)
   return mem;
 }
 
-void Arena_LoadFromMem(U8* mem, bool loadMusic)
+void Retro_Arena_LoadFromMemory(U8* mem, bool loadMusic)
 {
   U8* p = (U8*) mem;
 

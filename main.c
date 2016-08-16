@@ -102,12 +102,12 @@ void Step()
 
   if (input.released(AC_ARENA_SAVE))
   {
-    Arena_Save("arena.raw");
+    arena.save("arena.raw");
   }
 
   if (input.released(AC_ARENA_LOAD))
   {
-    Arena_Load("arena.raw", true);
+    arena.load("arena.raw", true);
   }
 
   if (input.down(AC_UP))

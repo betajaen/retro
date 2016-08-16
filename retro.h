@@ -282,13 +282,39 @@ Size Size_Make(U32 w, U32 h);
 
 
 
-void Arena_Save(const char* filename);
 
-void Arena_Load(const char* filename, bool loadMusic);
+void Retro_Arena_LoadFromMemory(U8* mem, bool loadMusic);
 
-U8* Arena_SaveToMem(U32* size);
+void Retro_Arena_Load(const char* filename, bool loadMusic);
 
-void Arena_LoadFromMem(U8* mem, bool loadMusic);
+U8* Retro_Arena_SaveToMemory(U32* outSize);
+
+void Retro_Arena_Save(const char* filename);
+
+#if RETRO_NAMESPACES == 1
+const struct RETRO_Arena
+{
+  U32  size;
+  void (*loadFromMemory)(U8* mem, bool loadMusic);
+  void (*load)(const char* filename, bool loadMusic);
+  U8*  (*saveToMemory)(U32* outSize);
+  void (*save)(const char* filename);
+}
+RETRO_ARENA_NAMESPACE_NAME
+= {
+  .size          = RETRO_ARENA_SIZE,
+  .loadFromMemory = Retro_Arena_LoadFromMemory,
+  .load           = Retro_Arena_Load,
+  .saveToMemory   = Retro_Arena_SaveToMemory,
+  .save           = Retro_Arena_Save
+};
+#elif RETRO_NAMESPACES == 0
+#define Arena_LoadFromMemory(U8_PTR_mem, BOOL_loadMusic)    Retro_Arena_LoadFromMemory(U8_PTR_mem, BOOL_loadMusic)
+#define Arena_Load(CONST_CHAR_filename, BOOL_loadMusic)     Retro_Arena_Load(CONST_CHAR_filename, BOOL_loadMusic)
+#define Arena_SaveToMemory(U32_PTR_outSize)                 Retro_Arena_SaveToMemory(U32_PTR_outSize)
+#define Arena_Save(CONST_CHAR_filename)                     Retro_Arena_Save(CONST_CHAR_filename)
+#endif
+
 
 void Retro_Scope_Push(int name);
 
@@ -301,7 +327,6 @@ void Retro_Scope_Rewind();
 void Retro_Scope_Pop();
 
 #define Retro_Scope_New(T) ((T*) Retro_Scope_Obtain(sizeof(T)))
-
 
 #if RETRO_NAMESPACES == 1
 const struct RETRO_Scope
