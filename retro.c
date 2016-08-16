@@ -187,7 +187,7 @@ void* Resource_Load(const char* name, U32* outSize)
 }
 
 
-void  Palette_LoadFromBitmap(const char* name, Palette* palette)
+void  Retro_Palette_Load(const char* name)
 {
   U32 width, height;
 
@@ -218,9 +218,9 @@ void  Palette_LoadFromBitmap(const char* name, Palette* palette)
     colour.g = imageData[i + 1];
     colour.b = imageData[i + 2];
 
-    if (Palette_HasColour(palette, colour) == false)
+    if (Retro_Palette_Has(colour) == false)
     {
-      Palette_Add(palette, colour);
+      Retro_Palette_Add(colour);
     }
 
   }
@@ -254,7 +254,7 @@ void Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset)
   for(U32 i=0, j=0;i < width * height;++i, j+=3)
   {
     U32 idx = (imageData[i] + colourOffset) & 0xFF;
-    Colour colour = Palette_GetColour(&gSettings.palette, idx);
+    Colour colour = Retro_Palette_Get(idx);
 
     pixels[j+0] = colour.r;
     pixels[j+1] = colour.g;
@@ -641,7 +641,7 @@ void Canvas_Clear()
   SDL_RenderClear(gRenderer);
 }
 
-void  Palette_Make(Palette* palette)
+void  Retro_Palette_MakeImpl(Palette* palette)
 {
   assert(palette);
   palette->count = 0;
@@ -649,7 +649,7 @@ void  Palette_Make(Palette* palette)
   palette->transparent = 0;
 }
 
-void  Palette_Add(Palette* palette, Colour colour)
+void  Retro_Palette_AddImpl(Palette* palette, Colour colour)
 {
   assert(palette);
   assert(palette->count <= 255);
@@ -657,15 +657,20 @@ void  Palette_Add(Palette* palette, Colour colour)
   ++palette->count;
 }
 
-void Palette_AddRGBInt(Palette* palette, U32 rgb)
+void  Retro_Palette_Add(Colour colour)
+{
+  Retro_Palette_AddImpl(&gSettings.palette, colour);
+}
+
+void Retro_Palette_AddRGB(U32 rgb)
 {
   RetroFourByteUnion c;
   c.q = rgb;
-  
-  Palette_Add(palette, Colour_Make(c.b[2], c.b[1], c.b[0]));
+
+  Retro_Palette_AddImpl(&gSettings.palette, Colour_Make(c.b[2], c.b[1], c.b[0]));
 }
 
-U8 Palette_FindColour(Palette* palette, Colour colour)
+U8 Retro_Palette_IndexImpl(Palette* palette, Colour colour)
 {
   assert(palette);
 
@@ -678,7 +683,12 @@ U8 Palette_FindColour(Palette* palette, Colour colour)
   return palette->fallback;
 }
 
-bool Palette_HasColour(Palette* palette, Colour colour)
+U8 Retro_Palette_Index(Colour colour)
+{
+  return Retro_Palette_IndexImpl(&gSettings.palette, colour);
+}
+
+bool Retro_Palette_HasImpl(Palette* palette, Colour colour)
 {
   assert(palette);
 
@@ -691,7 +701,18 @@ bool Palette_HasColour(Palette* palette, Colour colour)
   return false;
 }
 
-void Palette_CopyTo(const Palette* src, Palette* dst)
+bool Retro_Palette_Has(Colour colour)
+{
+  return Retro_Palette_HasImpl(&gSettings.palette, colour);
+}
+
+Colour Retro_Palette_Get(U8 index)
+{
+  Palette* palette = &gSettings.palette;
+  return ((palette)->colours[index >= (palette)->count ? (palette)->fallback : index]);
+}
+
+void Retro_Palette_Copy(const Palette* src, Palette* dst)
 {
   assert(src);
   assert(dst);
@@ -711,7 +732,7 @@ Colour Colour_Make(U8 r, U8 g, U8 b)
   return c;
 }
 
-Colour Colour_ReadRGB(U8* p)
+Colour Retro_Colour_ReadRGB(U8* p)
 {
   Colour c;
   c.r = *(p + 0);
@@ -952,7 +973,7 @@ void Canvas_DrawPalette(Palette* palette, U32 Y)
 
 void Canvas_DrawRectangle(U8 colour, Rect rect)
 {
-  Colour rgb = Palette_GetColour(&gSettings.palette, colour);
+  Colour rgb = Retro_Palette_Get(colour);
   SDL_Rect dst;
   RETRO_SDL_TO_RECT(rect, dst);
 
@@ -965,7 +986,7 @@ void Canvas_DrawRectangle(U8 colour, Rect rect)
 
 void Canvas_DrawFilledRectangle(U8 colour, Rect rect)
 {
-  Colour rgb = Palette_GetColour(&gSettings.palette, colour);
+  Colour rgb = Retro_Palette_Get(colour);
   SDL_Rect dst;
   RETRO_SDL_TO_RECT(rect, dst);
 
@@ -983,7 +1004,7 @@ void Canvas_PrintStr(U32 x, U32 y, Font* font, U8 colour, const char* str)
   assert(font);
   assert(str);
 
-  Colour rgb = Palette_GetColour(&gSettings.palette, colour);
+  Colour rgb = Retro_Palette_Get(colour);
 
   SDL_Rect s, d;
   s.x = 0;
@@ -1300,7 +1321,7 @@ void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
   }
 }
 
-void  Font_Make(Font* font)
+void  Retro_Font_Make(Font* font)
 {
   assert(font);
   memset(font->widths, 0, sizeof(font->widths));
@@ -1311,7 +1332,7 @@ void  Font_Make(Font* font)
   font->bitmap.imageData = NULL;
 }
 
-void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour transparentColour)
+void Retro_Font_Load(const char* name, Font* outFont, Colour markerColour, Colour transparentColour)
 {
   U32 width, height;
 
@@ -1345,7 +1366,7 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
   // Scan the first line for markers.
   for(i=0;i < width * 3;i+=3)
   {
-    Colour col = Colour_ReadRGB(&imageData[i]);
+    Colour col = Retro_Colour_ReadRGB(&imageData[i]);
     if (Colour_Equals(col, markerColour))
     {
       int x = i / 3;
@@ -1369,7 +1390,7 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
   // Copy rest of image into the texture.
   for(i=0, j=width * 3;i < width * height * 4;i+=4, j+=3)
   {
-    Colour col = Colour_ReadRGB(&imageData[j]);
+    Colour col = Retro_Colour_ReadRGB(&imageData[j]);
 
     pixels[i+0] = 0xFF;
     pixels[i+1] = 0xFF;
@@ -1394,7 +1415,7 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
   outFont->bitmap.imageData = imageData;
 }
 
-int Input_TextInput(char* str, U32 capacity)
+int Retro_Input_TextInput(char* str, U32 capacity)
 {
   assert(str);
   U32 len = strlen(str);
@@ -1457,7 +1478,7 @@ InputActionBinding* Input_MakeAction(int action)
 }
 
 
-void  Input_BindKey(int key, int action)
+void  Retro_Input_BindKey(int key, int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   
@@ -1478,7 +1499,7 @@ void  Input_BindKey(int key, int action)
   assert(true); // To many keys to bound
 }
 
-void  Input_BindAxis(int axis, int action)
+void  Retro_Input_BindAxis(int axis, int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
 
@@ -1499,7 +1520,7 @@ void  Input_BindAxis(int axis, int action)
   assert(true); // To many keys to bound
 }
 
-bool  Input_GetActionDown(int action)
+bool  Retro_Input_Down(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -1507,7 +1528,7 @@ bool  Input_GetActionDown(int action)
   return binding->state == 1;
 }
 
-bool  Input_GetActionReleased(int action)
+bool  Retro_Input_Released(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -1515,7 +1536,7 @@ bool  Input_GetActionReleased(int action)
   return binding->state == 0 && binding->lastState == 1;
 }
 
-bool  Input_GetActionPressed(int action)
+bool  Retro_Input_Pressed(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -1523,7 +1544,7 @@ bool  Input_GetActionPressed(int action)
   return binding->state == 1 && binding->lastState == 0;
 }
 
-S16   Input_GetActionNowAxis(int action)
+S16   Retro_Input_Axis(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -1531,7 +1552,7 @@ S16   Input_GetActionNowAxis(int action)
   return binding->state;
 }
 
-S16   Input_GetActionDeltaAxis(int action)
+S16   Retro_Input_DeltaAxis(int action)
 {
   InputActionBinding* binding = Input_GetAction(action);
   assert(binding);
@@ -1546,7 +1567,7 @@ typedef enum
   TF_Paused  = 2
 } Retro_TimerFlags;
 
-void  Timer_Make(Timer* timer)
+void  Retro_Timer_Make(Timer* timer)
 {
   assert(timer);
   timer->start = 0;
@@ -1554,7 +1575,7 @@ void  Timer_Make(Timer* timer)
   timer->flags = TF_None;
 }
 
-void  Timer_Start(Timer* timer)
+void  Retro_Timer_Start(Timer* timer)
 {
   assert(timer);
   timer->flags = TF_Started;
@@ -1562,7 +1583,7 @@ void  Timer_Start(Timer* timer)
   timer->paused = 0;
 }
 
-void  Timer_Stop(Timer* timer)
+void  Retro_Timer_Stop(Timer* timer)
 {
   assert(timer);
 
@@ -1571,7 +1592,7 @@ void  Timer_Stop(Timer* timer)
   timer->flags = TF_None;
 }
 
-void  Timer_Pause(Timer* timer)
+void  Retro_Timer_Pause(Timer* timer)
 {
   assert(timer);
 
@@ -1583,7 +1604,7 @@ void  Timer_Pause(Timer* timer)
   }
 }
 
-void  Timer_Unpause(Timer* timer)
+void  Retro_Timer_Unpause(Timer* timer)
 {
   assert(timer);
 
@@ -1595,7 +1616,7 @@ void  Timer_Unpause(Timer* timer)
   }
 }
 
-U32   Timer_GetTicks(Timer* timer)
+U32   Retro_Timer_Ticks(Timer* timer)
 {
   assert(timer);
 
@@ -1616,12 +1637,12 @@ U32   Timer_GetTicks(Timer* timer)
   return time;
 }
 
-bool  Timer_IsStarted(Timer* timer)
+bool  Retro_Timer_Started(Timer* timer)
 {
   return timer->flags >= TF_Started;
 }
 
-bool  Timer_IsPaused(Timer* timer)
+bool  Retro_Timer_Paused(Timer* timer)
 {
   return timer->flags >= TF_Paused;
 }
@@ -1745,9 +1766,9 @@ void Canvas_Present()
 void Frame()
 {
 
-  Timer_Start(&gCapTimer);
+  Retro_Timer_Start(&gCapTimer);
 
-  gDeltaTime = Timer_GetTicks(&gDeltaTimer);
+  gDeltaTime = Retro_Timer_Ticks(&gDeltaTimer);
 
   SDL_Event event;
   gInputCharState = ICS_None;
@@ -1783,7 +1804,7 @@ void Frame()
     }
   }
 
-  gFps = gCountedFrames / (Timer_GetTicks(&gFpsTimer) / 1000.0f);
+  gFps = gCountedFrames / (Retro_Timer_Ticks(&gFpsTimer) / 1000.0f);
   if (gFps > 200000.0f)
   {
     gFps = 0.0f;
@@ -1818,7 +1839,7 @@ void Frame()
     if (gCanvasFlags[i] & CNF_Clear)
     {
       Canvas_Set(i);
-      Colour col = Palette_GetColour(&gSettings.palette, gCanvasBackgroundColour[i]);
+      Colour col = Retro_Palette_Get(gCanvasBackgroundColour[i]);
       SDL_SetRenderDrawColor(gRenderer, col.r, col.g, col.b, 0x00);
       Canvas_Clear();
       SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0x00);
@@ -1836,7 +1857,7 @@ void Frame()
   
   ++gCountedFrames;
   
-  Timer_Start(&gDeltaTimer);
+  Retro_Timer_Start(&gDeltaTimer);
 }
 
 
@@ -1868,10 +1889,10 @@ int main(int argc, char **argv)
   gSettings.windowWidth = RETRO_WINDOW_DEFAULT_WIDTH;
   gSettings.windowHeight = RETRO_WINDOW_DEFAULT_HEIGHT;
   
-  Palette_Make(&gSettings.palette);
+  Retro_Palette_MakeImpl(&gSettings.palette);
 
   for (U32 i=0;i < RETRO_ARRAY_COUNT(kDefaultPalette);i++)
-    Palette_Add(&gSettings.palette, kDefaultPalette[i]);
+    Retro_Palette_Add(kDefaultPalette[i]);
 
   memset(gAnimations, 0, 256 * sizeof(Animation*));
   memset(gSprites, 0, 256 * sizeof(Sprite*));
@@ -1921,6 +1942,8 @@ int main(int argc, char **argv)
   gFramePresentation = FP_Normal;
   gFrameAlpha = 0.78f;
   gFrameBeta = 0.78f;
+  
+  Retro_Palette_MakeImpl(&gSettings.palette);
 
   Init(&gSettings);
 
@@ -1944,15 +1967,15 @@ int main(int argc, char **argv)
   Restart();
 
   gCountedFrames = 0;
-  Timer_Start(&gFpsTimer);
-  Timer_Start(&gDeltaTimer);
+  Retro_Timer_Start(&gFpsTimer);
+  Retro_Timer_Start(&gDeltaTimer);
 
   #ifdef RETRO_WINDOWS
 
   while(gQuit == false)
   {
     Frame();
-    float frameTicks = Timer_GetTicks(&gCapTimer);
+    float frameTicks = Retro_Timer_Ticks(&gCapTimer);
     if (frameTicks < (1000.0f / RETRO_FRAME_RATE))
     {
       SDL_Delay((1000.0f / RETRO_FRAME_RATE) - frameTicks);

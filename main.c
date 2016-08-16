@@ -7,6 +7,8 @@ static Bitmap         SPRITESHEET;
 static Animation      ANIMATEDSPRITE_QUOTE_IDLE;
 static Animation      ANIMATEDSPRITE_QUOTE_WALK;
 static Sound          SOUND_COIN;
+static Timer          TIMER;
+
 
 typedef enum 
 {
@@ -42,22 +44,22 @@ void Init(Settings* settings)
   settings->windowWidth = 1280;
   settings->windowHeight = 720;
 
-  Palette_Make(&settings->palette);
-  Palette_LoadFromBitmap("palette.png", &settings->palette);
+  //palette.load()
 
-  Input_BindKey(SDL_SCANCODE_W, AC_UP);
-  Input_BindKey(SDL_SCANCODE_D, AC_RIGHT);
-  Input_BindKey(SDL_SCANCODE_S, AC_DOWN);
-  Input_BindKey(SDL_SCANCODE_A, AC_LEFT);
+  palette.load("palette.png");
 
-  Input_BindKey(SDL_SCANCODE_RETURN, AC_ACTION);
-  Input_BindKey(SDL_SCANCODE_ESCAPE, AC_CANCEL);
-  Input_BindKey(SDL_SCANCODE_1, AC_MUSIC_ON);
-  Input_BindKey(SDL_SCANCODE_2, AC_MUSIC_OFF);
-  Input_BindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
-  Input_BindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
+  input.bindKey(SDL_SCANCODE_W, AC_UP);
+  input.bindKey(SDL_SCANCODE_D, AC_RIGHT);
+  input.bindKey(SDL_SCANCODE_S, AC_DOWN);
+  input.bindKey(SDL_SCANCODE_A, AC_LEFT);
+  input.bindKey(SDL_SCANCODE_RETURN, AC_ACTION);
+  input.bindKey(SDL_SCANCODE_ESCAPE, AC_CANCEL);
+  input.bindKey(SDL_SCANCODE_1, AC_MUSIC_ON);
+  input.bindKey(SDL_SCANCODE_2, AC_MUSIC_OFF);
+  input.bindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
+  input.bindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
 
-  Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
+  Retro_Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
   Bitmap_Load("cave.png", &SPRITESHEET, 0);
 
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_IDLE, &SPRITESHEET, 1, 100, 0, 80, 16, 16);
@@ -76,45 +78,48 @@ void Start()
   state->velocity.x = 0;
   state->velocity.y = 0;
 
+  timer.make(&TIMER);
+  timer.start(&TIMER);
+
   Music_Play("origin.mod");
 }
 
 void Step()
 {
 
-  if (Input_GetActionReleased(AC_ACTION))
+  if (input.released(AC_ACTION))
   {
     Sound_Play(&SOUND_COIN, 128);
   }
 
-  if (Input_GetActionReleased(AC_MUSIC_ON))
+  if (input.released(AC_MUSIC_ON))
   {
     Music_Play("origin.mod");
   }
 
-  if (Input_GetActionReleased(AC_MUSIC_OFF))
+  if (input.released(AC_MUSIC_OFF))
   {
     Music_Stop();
   }
 
-  if (Input_GetActionReleased(AC_ARENA_SAVE))
+  if (input.released(AC_ARENA_SAVE))
   {
     Arena_Save("arena.raw");
   }
 
-  if (Input_GetActionReleased(AC_ARENA_LOAD))
+  if (input.released(AC_ARENA_LOAD))
   {
     Arena_Load("arena.raw", true);
   }
 
-  if (Input_GetActionDown(AC_UP))
+  if (input.down(AC_UP))
     state->velocity.y -= 1;
-  else if (Input_GetActionDown(AC_DOWN))
+  else if (input.down(AC_DOWN))
     state->velocity.y += 1;
 
-  if (Input_GetActionDown(AC_LEFT))
+  if (input.down(AC_LEFT))
     state->velocity.x--;
-  else if (Input_GetActionDown(AC_RIGHT))
+  else if (input.down(AC_RIGHT))
     state->velocity.x++;
   else
   {
@@ -168,6 +173,9 @@ void Step()
   state->player.x += 10;
   Canvas_Set(1);
   Canvas_PlaceAnimated(&state->player, true);
+  
+  U32 ms = timer.ticks(&TIMER);
+  Canvas_PrintF(10, 10, &FONT_NEOSANS, 15, "%i", ms);
 
   Canvas_Debug(&FONT_NEOSANS);
 }

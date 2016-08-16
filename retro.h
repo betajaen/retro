@@ -76,6 +76,14 @@
 #define RETRO_AUDIO_SAMPLES 16384
 #endif 
 
+#ifndef RETRO_NAMESPACES
+#define RETRO_NAMESPACES 1
+#endif
+
+#ifdef RETRO_AMERICAN
+#define Color Colour
+#endif
+
 #define RETRO_UNUSED(X) (void)X
 #define RETRO_ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
@@ -365,65 +373,183 @@ void  Music_Play(const char* name);
 
 void  Music_Stop();
 
-void  Palette_Make(Palette* palette);
+void  Retro_Palette_Load(const char* name);
 
-void  Palette_SetDefault(const Palette* palette);
+void  Retro_Palette_Add(Colour colour);
 
-void  Palette_LoadFromBitmap(const char* name, Palette* palette);
+void  Retro_Palette_AddRGB(U32 rgb);
 
-void  Palette_Add(Palette* palette, Colour colour);
+U8    Retro_Palette_Index(Colour colour);
 
-void  Palette_AddARGBInt(Palette* palette, U32 argb);
+bool  Retro_Palette_Has(Colour colour);
 
-U8    Palette_FindColour(Palette* palette, Colour colour);
+Colour Retro_Palette_Get(U8 index);
 
-bool  Palette_HasColour(Palette* palette, Colour colour);
+#if RETRO_NAMESPACES == 1
+  const struct RETRO_Palette {
+    void (*load)(const char* name);
+    void (*add)(Colour colour);
+    void (*addRGB)(U32 argb);
+    U8   (*index)(Colour colour);
+    bool (*has)(Colour colour);
+    Colour (*get)(U8 index);
+  }
+  #ifdef RETRO_PALETTE_IS
+    RETRO_PALETTE_IS
+  #else
+    palette
+  #endif
+  = {
+    .load    = Retro_Palette_Load,
+    .add     = Retro_Palette_Add,
+    .addRGB  = Retro_Palette_AddRGB,
+    .index   = Retro_Palette_Index,
+    .has     = Retro_Palette_Has,
+    .get     = Retro_Palette_Get
+  };
+#else
+#   define  Palette_Load(CONST_CHAR_name)             Retro_Palette_Load(CONST_CHAR_name)
+#   define  Palette_Add(COLOUR_colour)                Retro_Palette_Add(COLOUR_colour)
+#   define  Palette_AddRGB(U32_argb)                  Retro_Palette_AddARGB(U32_argb)
+#   define  Palette_Index(COLOUR_colour)              Retro_Palette_Index(COLOUR_colour)
+#   define  Palette_Has(COLOUR_colour)                Retro_Palette_Has(COLOUR_colour)
+#   define  Palette_Get(U8_index)                     Retro_Palette_Get(U8_index)
+#endif
 
-void  Palette_CopyTo(const Palette* src, Palette* dst);
+void  Retro_Font_Make(Font* font);
 
-#define Palette_GetColour(PALETTE, INDEX) \
-  ((PALETTE)->colours[INDEX >= (PALETTE)->count ? (PALETTE)->fallback : INDEX])
+void  Retro_Font_Load(const char* name, Font* inFont, Colour markerColour, Colour transparentColour);
 
-void  Font_Make(Font* font);
+#if RETRO_NAMESPACES == 1
+  const struct RETRO_Font {
+    void (*make)(Font* font);
+    void (*load)(const char* name, Font* inFont, Colour markerColour, Colour transparentColour);
+  } 
+#ifdef RETRO_FONT_IS
+  RETRO_FONT_IS
+#else
+  font
+#endif
+   = {
+    .make = Retro_Font_Make,
+    .load = Retro_Font_Load
+  };
+#else
+  #define Font_Make(FONT)                                                                       Retro_Font_Make(FONT)
+  #define Font_Load(CONST_CHAR_name, FONT_IN_font, COLOUR_markerColour, COLOUR_transparentColour)  Retro_Load(CONST_CHAR_name, FONT_IN_font, COLOUR_markerColour, COLOUR_transparentColour)
+#endif
 
-void  Font_Load(const char* name, Font* font, Colour markerColour, Colour transparentColour);
+int   Retro_Input_TextInput(char* str, U32 capacity);
 
-int   Input_TextInput(char* str, U32 capacity);
+void  Retro_Input_BindKey(int sdl_scancode, int action);
 
-void  Input_BindKey(int key, int action);
+void  Retro_Input_BindAxis(int axis, int action);
 
-void  Input_BindAxis(int axis, int action);
+bool  Retro_Input_Down(int action);
 
-bool  Input_GetActionDown(int action);
+bool  Retro_Input_Released(int action);
 
-bool  Input_GetActionReleased(int action);
+bool  Retro_Input_Pressed(int action);
 
-bool  Input_GetActionPressed(int action);
+S16   Retro_Input_Axis(int action);
 
-S16   Input_GetActionNowAxis(int action);
+S16   Retro_Input_DeltaAxis(int action);
 
-S16   Input_GetActionDeltaAxis(int action);
+#if RETRO_NAMESPACES == 1
+  const struct RETRO_Input {
+    int(*textInput)(char* str, U32 capacity);
+    void(*bindKey)(int sdl_scancode, int action);
+    void(*bindAxis)(int axis, int action);
+    bool(*down)(int action);
+    bool(*released)(int action);
+    bool(*pressed)(int action);
+    S16(*axis)(int action);
+    S16(*deltaAxis)(int action);
+  }
+#ifdef RETRO_INPUT_IS
+    RETRO_INPUT_IS
+#else
+    input
+#endif
+  = {
+    .textInput = Retro_Input_TextInput,
+    .bindKey   = Retro_Input_BindKey,
+    .bindAxis  = Retro_Input_BindAxis,
+    .down      = Retro_Input_Down,
+    .released  = Retro_Input_Released,
+    .pressed   = Retro_Input_Pressed,
+    .axis      = Retro_Input_Axis,
+    .deltaAxis = Retro_Input_DeltaAxis
+  };
+#else
+#   define Input_TextInput(CHAR_str, U32_capacity)         Retro_Input_TextInput(CHAR_str, U32_capacity)
+#   define Input_BindKey(INT_sdlscancode, INT_action)      Retro_Input_BindKey(INT_sdlscancode, INT_action)
+#   define Input_BindAxis(INT_axis, INT_action)            Retro_Input_BindAxis(INT_axis, INT_action)
+#   define Input_Down(INT_action)                          Retro_Input_Down(INT_action)
+#   define Input_Released(INT_action)                      Retro_Input_Released(INT_action)
+#   define Input_Pressed(INT_action)                       Retro_Input_Pressed(INT_action)
+#   define Input_NowAxis(INT_action)                       Retro_Input_NowAxis(INT_action)
+#   define Input_DeltaAxis(INT_action)                     Retro_Input_DeltaAxis(INT_action)
+#endif
 
-void  Timer_Make(Timer* timer);
+void  Retro_Timer_Make(Timer* timer);
 
-void  Timer_Start(Timer* timer);
+void  Retro_Timer_Start(Timer* timer);
 
-void  Timer_Stop(Timer* timer);
+void  Retro_Timer_Stop(Timer* timer);
 
-void  Timer_Pause(Timer* timer);
+void  Retro_Timer_Pause(Timer* timer);
 
-void  Timer_Unpause(Timer* timer);
+void  Retro_Timer_Unpause(Timer* timer);
 
-U32   Timer_GetTicks(Timer* timer);
+U32   Retro_Timer_Ticks(Timer* timer);
 
-bool  Timer_IsStarted(Timer* timer);
+bool  Retro_Timer_Started(Timer* timer);
 
-bool  Timer_IsPaused(Timer* timer);
+bool  Retro_Timer_Paused(Timer* timer);
+
+#if RETRO_NAMESPACES == 1
+  const struct RETRO_Timer {
+    void (*make)(Timer* timer);
+    void (*start)(Timer* timer);
+    void (*stop)(Timer* timer);
+    void (*pause)(Timer* timer);
+    void (*unpause)(Timer* timer);
+    U32  (*ticks)(Timer* timer);
+    bool (*started)(Timer* timer);
+    bool (*paused)(Timer* timer);
+  } 
+  #ifdef RETRO_TIMER_IS
+    RETRO_TIMER_IS
+  #else
+    timer
+  #endif
+  = {
+    .make    = Retro_Timer_Make,
+    .start   = Retro_Timer_Start,
+    .stop    = Retro_Timer_Stop,
+    .pause   = Retro_Timer_Pause,
+    .unpause = Retro_Timer_Unpause,
+    .ticks   = Retro_Timer_Ticks,
+    .started = Retro_Timer_Started,
+    .paused  = Retro_Timer_Paused,
+  };
+#else
+#   define Timer_Make(TIMER)      Retro_TimerMake(TIMER)
+#   define Timer_Start(TIMER)     Retro_Timer_Start(TIMER)
+#   define Timer_Stop(TIMER)      Retro_Timer_Stop(TIMER)
+#   define Timer_Pause(TIMER)     Retro_Timer_Pause(TIMER)
+#   define Timer_Unpause(TIMER)   Retro_Timer_Unpause(TIMER)
+#   define Timer_Ticks(TIMER)     Retro_Timer_Ticks(TIMER)
+#   define Timer_Started(TIMER)   Retro_Timer_Started(TIMER)
+#   define Timer_Paused(TIMER)    Retro_Timer_Paused(TIMER)
+#endif
 
 void  Init(Settings* s);
 
 void  Start();
 
 void  Step();
+
 
 #endif
