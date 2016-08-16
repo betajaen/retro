@@ -18,25 +18,15 @@
 #include <emscripten.h>
 #endif
 
-Colour kDefaultPalette[] = {
-  { 0xFF, 0x00, 0xFF },
-  { 0x14, 0x0c, 0x1c },
-  { 0x44, 0x24, 0x34 },
-  { 0x30, 0x34, 0x6d },
-  { 0x4e, 0x4a, 0x4e },
-  { 0x85, 0x4c, 0x30 },
-  { 0x34, 0x65, 0x24 },
-  { 0xd0, 0x46, 0x48 },
-  { 0x75, 0x71, 0x61 },
-  { 0x59, 0x7d, 0xce },
-  { 0xd2, 0x7d, 0x2c },
-  { 0x85, 0x95, 0xa1 },
-  { 0x6d, 0xaa, 0x2c },
-  { 0xd2, 0xaa, 0x99 },
-  { 0x6d, 0xc2, 0xca },
-  { 0xda, 0xd4, 0x5e },
-  { 0xde, 0xee, 0xd6 }
-};
+typedef struct
+{
+  U16     windowWidth;
+  U16     windowHeight;
+  U16     canvasWidth;
+  U16     canvasHeight;
+  F32     soundVolume;
+  Palette palette;
+} Settings;
 
 void (*FinalizerFn)(void* ptr);
 
@@ -612,7 +602,16 @@ void  Retro_Palette_Add(Colour colour)
   Retro_Palette_AddImpl(&gSettings.palette, colour);
 }
 
-void Retro_Palette_AddRGB(U32 rgb)
+void  Retro_Palette_Add2(U8 r, U8 g, U8 b)
+{
+  Colour colour;
+  colour.r = r;
+  colour.g = g;
+  colour.b = b;
+  Retro_Palette_AddImpl(&gSettings.palette, colour);
+}
+
+void Retro_Palette_Add3(U32 rgb)
 {
   RetroFourByteUnion c;
   c.q = rgb;
@@ -1078,7 +1077,7 @@ void  Retro_Debug(Font* font)
     music = (int) 100 - (((float) gMusicContext->samples_remaining / (float) gMusicContext->length) *100.0f);
   }
 
-  Retro_Canvas_Printf(0, gSettings.canvasHeight - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount, music);
+  Retro_Canvas_Printf(0, gSettings.canvasHeight - font->height, font, gSettings.palette.fallback, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount, music);
 }
 
 void  Retro_Resources_LoadSound(const char* name, Sound* sound)
@@ -1843,8 +1842,28 @@ int main(int argc, char **argv)
   
   Retro_Palette_MakeImpl(&gSettings.palette);
 
-  for (U32 i=0;i < RETRO_ARRAY_COUNT(kDefaultPalette);i++)
-    Retro_Palette_Add(kDefaultPalette[i]);
+  #if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
+    Retro_Palette_Add2(0x14, 0x0c, 0x1c ); // black
+    Retro_Palette_Add2(0x44, 0x24, 0x34 ); // darkRed
+    Retro_Palette_Add2(0x30, 0x34, 0x6d ); // darkBlue
+    Retro_Palette_Add2(0x4e, 0x4a, 0x4e ); // darkGray
+    Retro_Palette_Add2(0x85, 0x4c, 0x30 ); // brown
+    Retro_Palette_Add2(0x34, 0x65, 0x24 ); // darkGreen
+    Retro_Palette_Add2(0xd0, 0x46, 0x48 ); // red
+    Retro_Palette_Add2(0x75, 0x71, 0x61 ); // lightGray
+    Retro_Palette_Add2(0x59, 0x7d, 0xce ); // lightBlue
+    Retro_Palette_Add2(0xd2, 0x7d, 0x2c ); // orange
+    Retro_Palette_Add2(0x85, 0x95, 0xa1 ); // blueGray
+    Retro_Palette_Add2(0x6d, 0xaa, 0x2c ); // lightGreen
+    Retro_Palette_Add2(0xd2, 0xaa, 0x99 ); // peach
+    Retro_Palette_Add2(0x6d, 0xc2, 0xca ); // cyan
+    Retro_Palette_Add2(0xda, 0xd4, 0x5e ); // yellow
+    Retro_Palette_Add2(0xde, 0xee, 0xd6 ); // white
+    Retro_Palette_Add2(0xFF, 0x00, 0xFF ); // magenta/transparent
+    
+    gSettings.palette.fallback = 15;
+    gSettings.palette.transparent = 16;
+  #endif
 
   memset(gAnimations, 0, 256 * sizeof(Animation*));
   memset(gSprites, 0, 256 * sizeof(Sprite*));
@@ -1895,9 +1914,7 @@ int main(int argc, char **argv)
   gFrameAlpha = 0.78f;
   gFrameBeta = 0.78f;
   
-  Retro_Palette_MakeImpl(&gSettings.palette);
-
-  Init(&gSettings);
+  Init();
 
   gCanvasSize = Size_Make(RETRO_CANVAS_DEFAULT_WIDTH, RETRO_CANVAS_DEFAULT_HEIGHT);
 

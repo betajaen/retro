@@ -114,6 +114,10 @@
 #define RETRO_FONT_NAMESPACE_NAME font
 #endif
 
+#ifndef RETRO_DEFAULT_PALETTE
+#define RETRO_DEFAULT_PALETTE 'DB16'
+#endif
+
 #endif
 
 #ifdef RETRO_AMERICAN
@@ -231,16 +235,6 @@ typedef struct
 
 typedef struct
 {
-  U16     windowWidth;
-  U16     windowHeight;
-  U16     canvasWidth;
-  U16     canvasHeight;
-  F32     soundVolume;
-  Palette palette;
-} Settings;
-
-typedef struct
-{
   U32    start, paused;
   U8     flags;
 } Timer;
@@ -261,16 +255,8 @@ typedef struct
   (P)->y = Y_VALUE;
 
 #define Rect_Translate(R, X, Y) \
-  (R)->left   += X; \
-  (R)->top    += Y; \
-  (R)->right  += X; \
-  (R)->bottom += Y;
-
-#define Rect_GetWidth(R) \
-  ((R)->right - (R)->left)
-
-#define Rect_GetHeight(R) \
-  ((R)->right - (R)->left)
+  (R)->x += X; \
+  (R)->y += Y;
 
 #define Colour_Equals(A, B) \
   (A.r == B.r && A.g == B.g && A.b == B.b)
@@ -314,6 +300,11 @@ RETRO_ARENA_NAMESPACE_NAME
 #define Arena_SaveToMemory(U32_PTR_outSize)                 Retro_Arena_SaveToMemory(U32_PTR_outSize)
 #define Arena_Save(CONST_CHAR_filename)                     Retro_Arena_Save(CONST_CHAR_filename)
 #endif
+
+
+
+
+
 
 
 void Retro_Scope_Push(int name);
@@ -563,7 +554,9 @@ void  Retro_Audio_StopMusic();
 
 void  Retro_Palette_Add(Colour colour);
 
-void  Retro_Palette_AddRGB(U32 rgb);
+void  Retro_Palette_Add2(U8 r, U8 g, U8 b);
+
+void  Retro_Palette_Add3(U32 rgb);
 
 U8    Retro_Palette_Index(Colour colour);
 
@@ -574,21 +567,65 @@ Colour Retro_Palette_Get(U8 index);
 #if RETRO_NAMESPACES == 1
   const struct RETRO_Palette {
     void (*add)(Colour colour);
+    void (*add2)(U8 r, U8 g, U8 b);
     void (*addRGB)(U32 argb);
     U8   (*index)(Colour colour);
     bool (*has)(Colour colour);
     Colour (*get)(U8 index);
+
+#if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
+    U8 black;
+    U8 darkRed;
+    U8 darkBlue;
+    U8 darkGray;
+    U8 brown;
+    U8 darkGreen;
+    U8 red;
+    U8 lightGray;
+    U8 lightBlue;
+    U8 orange;
+    U8 blueGray;
+    U8 lightGreen;
+    U8 peach;
+    U8 cyan;
+    U8 yellow;
+    U8 white;
+    U8 transparent;
+#endif
   }
   RETRO_PALETTE_NAMESPACE_NAME
   = {
     .add     = Retro_Palette_Add,
-    .addRGB  = Retro_Palette_AddRGB,
+    .addRGB  = Retro_Palette_Add3,
     .index   = Retro_Palette_Index,
     .has     = Retro_Palette_Has,
     .get     = Retro_Palette_Get
+    
+    #if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
+    , 
+    .black = 0,
+    .darkRed = 1,
+    .darkBlue = 2,
+    .darkGray = 3,
+    .brown = 4,
+    .darkGreen = 5,
+    .red = 6,
+    .lightGray = 7,
+    .lightBlue = 8,
+    .orange = 9,
+    .blueGray = 10,
+    .lightGreen = 11,
+    .peach = 12,
+    .cyan = 13,
+    .yellow = 14,
+    .white = 15,
+    .transparent = 16,
+    #endif
+
   };
 #elif RETRO_NAMESPACES == 0
 #   define  Palette_Add(COLOUR_colour)                Retro_Palette_Add(COLOUR_colour)
+#   define  Palette_Add2(U8_r, U8_g, U8_b)            Retro_Palette_Add2(U8_r, U8_g, U8_b);
 #   define  Palette_AddRGB(U32_argb)                  Retro_Palette_AddARGB(U32_argb)
 #   define  Palette_Index(COLOUR_colour)              Retro_Palette_Index(COLOUR_colour)
 #   define  Palette_Has(COLOUR_colour)                Retro_Palette_Has(COLOUR_colour)
@@ -642,6 +679,27 @@ S16   Retro_Input_DeltaAxis(int action);
 #   define Input_Pressed(INT_action)                       Retro_Input_Pressed(INT_action)
 #   define Input_NowAxis(INT_action)                       Retro_Input_NowAxis(INT_action)
 #   define Input_DeltaAxis(INT_action)                     Retro_Input_DeltaAxis(INT_action)
+
+#if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
+#define Colour_black 0 
+#define Colour_darkRed 1 
+#define Colour_darkBlue 2 
+#define Colour_darkGray 3 
+#define Colour_brown 4 
+#define Colour_darkGreen 5 
+#define Colour_red 6 
+#define Colour_lightGray 7 
+#define Colour_lightBlue 8 
+#define Colour_orange 9 
+#define Colour_blueGray 10 
+#define Colour_lightGreen 11 
+#define Colour_peach 12 
+#define Colour_cyan 13 
+#define Colour_yellow 14 
+#define Colour_white 15 
+#define Colour_transparent 16 
+#endif
+
 #endif
 
 void  Retro_Timer_Make(Timer* timer);
@@ -697,7 +755,7 @@ bool  Retro_Timer_Paused(Timer* timer);
 #   define Timer_Paused(TIMER)    Retro_Timer_Paused(TIMER)
 #endif
 
-void  Init(Settings* s);
+void  Init();
 
 void  Start();
 

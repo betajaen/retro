@@ -39,14 +39,10 @@ typedef struct
 
 GameState* state;
 
-void Init(Settings* settings)
+void Init()
 {
-  settings->windowWidth = 1280;
-  settings->windowHeight = 720;
-
-  resources.loadPalette("palette.png");
+  // resources.loadPalette("palette.png");
   resources.loadBitmap("cave.png", &SPRITESHEET, 0);
-
   resources.loadSound("coin.wav", &SOUND_COIN);
   resources.loadFont("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
 
@@ -174,7 +170,7 @@ void Step()
   canvas.animate(&state->player, true);
   
   U32 ms = timer.ticks(&TIMER);
-  canvas.printf(10, 10, &FONT_NEOSANS, 15, "%i", ms);
+  canvas.printf(10, 10, &FONT_NEOSANS, palette.peach, "%i", ms);
 
   Retro_Debug(&FONT_NEOSANS);
 }
