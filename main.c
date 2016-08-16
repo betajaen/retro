@@ -159,7 +159,7 @@ void Step()
   }
 
   canvas.use(0);
-  state->player.x -= 10;
+  state->player.x -= 10; // .
   canvas.animate(&state->player, true);
   state->player.x += 10;
   
