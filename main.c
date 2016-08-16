@@ -2,14 +2,12 @@
 
 #include "retro.c"
 
-static Font           FONT_NEOSANS;
-static Bitmap         SPRITESHEET;
+static Font                 FONT_NEOSANS;
+static BitmapHandle         SPRITESHEET;
 static AnimationHandle      ANIMATEDSPRITE_QUOTE_IDLE;
 static AnimationHandle      ANIMATEDSPRITE_QUOTE_WALK;
-static Sound          SOUND_COIN;
-static Timer          TIMER;
-
-
+static SoundHandle          SOUND_COIN;
+static Timer                TIMER;
 
 typedef enum 
 {
@@ -42,8 +40,8 @@ GameState* state;
 
 void Init()
 {
-  resources.loadBitmap("cave.png", &SPRITESHEET, 0);
-  resources.loadSound("coin.wav", &SOUND_COIN);
+  SPRITESHEET = resources.loadBitmap("cave.png", 0);
+  SOUND_COIN  = resources.loadSound("coin.wav");
   resources.loadFont("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
 
   input.bindKey(SDL_SCANCODE_W, AC_UP);
@@ -57,8 +55,8 @@ void Init()
   input.bindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
   input.bindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
 
-  ANIMATEDSPRITE_QUOTE_IDLE = sprites.loadAnimationH(&SPRITESHEET, 1, 100, 0, 80, 16, 16);
-  ANIMATEDSPRITE_QUOTE_WALK = sprites.loadAnimationH(&SPRITESHEET, 4, 120, 0, 80, 16, 16);
+  ANIMATEDSPRITE_QUOTE_IDLE = sprites.loadAnimationH(SPRITESHEET, 1, 100, 0, 80, 16, 16);
+  ANIMATEDSPRITE_QUOTE_WALK = sprites.loadAnimationH(SPRITESHEET, 4, 120, 0, 80, 16, 16);
 }
 
 void Start()
@@ -82,7 +80,7 @@ void Step()
 
   if (input.released(AC_ACTION))
   {
-    audio.playSound(&SOUND_COIN, 128);
+    audio.playSound(SOUND_COIN, 128);
   }
 
   if (input.released(AC_MUSIC_ON))

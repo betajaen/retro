@@ -56,6 +56,13 @@
 #define RETRO_MAX_ANIMATED_SPRITE_FRAMES 8
 #endif
 
+#ifndef RETRO_MAX_BITMAPS
+#define RETRO_MAX_BITMAPS 16
+#endif
+
+#ifndef RETRO_MAX_SOUNDS
+#define RETRO_MAX_SOUNDS 64
+#endif
 #ifndef RETRO_MAX_ANIMATIONS
 #define RETRO_MAX_ANIMATIONS 256
 #endif
@@ -159,14 +166,8 @@ typedef double   F64;
 
 typedef U16 SpriteHandle;
 typedef U16 AnimationHandle;
-typedef U8  BitmapHandle;
-
-typedef struct
-{
-  SDL_Texture*  texture;
-  U8*    imageData;
-  U16    w, h;
-} Bitmap;
+typedef U16 BitmapHandle;
+typedef U16 SoundHandle;
 
 typedef struct
 {
@@ -224,10 +225,10 @@ typedef struct
 
 typedef struct
 {
-  Bitmap bitmap;
-  U8     height;
-  U16    x[256];
-  U8     widths[256];
+  BitmapHandle bitmap;
+  U8           height;
+  U16          x[256];
+  U8           widths[256];
 } Font;
 
 typedef struct
@@ -235,13 +236,6 @@ typedef struct
   U32    start, paused;
   U8     flags;
 } Timer;
-
-typedef struct
-{
-  S32 length;
-  U8* buffer;
-  SDL_AudioSpec spec;
-} Sound;
 
 #define Point_Translate(P, X_VALUE, Y_VALUE) \
   (P)->x += X_VALUE; \
@@ -353,10 +347,10 @@ RETRO_SCOPE_NAMESPACE_NAME
 void  Retro_Resources_LoadPalette(const char* name);
 
 // Loads a bitmap and matches the palette to the canvas palette best it can.
-void  Retro_Resources_LoadBitmap(const char* name, Bitmap* outBitmap, U8 transparentIndex);
+BitmapHandle  Retro_Resources_LoadBitmap(const char* name, U8 transparentIndex);
 
 // Load a sound into Sound
-void  Retro_Resources_LoadSound(const char* name, Sound* sound);
+SoundHandle Retro_Resources_LoadSound(const char* name);
 
 void  Retro_Resources_LoadFont(const char* name, Font* inFont, Colour markerColour, Colour transparentColour);
 
@@ -364,8 +358,8 @@ void  Retro_Resources_LoadFont(const char* name, Font* inFont, Colour markerColo
 const struct RETRO_Resources
 {
   void (*loadPalette)(const char* name);
-  void (*loadBitmap)(const char* name, Bitmap* outBitmap, U8 transparentIndex);
-  void (*loadSound)(const char* name, Sound* inSound);
+  BitmapHandle (*loadBitmap)(const char* name, U8 transparentIndex);
+  SoundHandle  (*loadSound)(const char* name);
   void (*loadFont)(const char* name, Font* inFont, Colour markerColour, Colour transparentColour);
 }
 RETRO_RESOURCES_NAMESPACE_NAME
@@ -388,11 +382,11 @@ RETRO_RESOURCES_NAMESPACE_NAME
 
 
 
-SpriteHandle Retro_Sprites_LoadSprite(Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
+SpriteHandle Retro_Sprites_LoadSprite(BitmapHandle bitmap, U32 x, U32 y, U32 w, U32 h);
 
-AnimationHandle Retro_Sprites_LoadAnimationH(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+AnimationHandle Retro_Sprites_LoadAnimationH(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
 
-AnimationHandle Retro_Sprites_LoadAnimationV(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+AnimationHandle Retro_Sprites_LoadAnimationV(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
 
 void  Retro_Sprites_NewAnimationObject(AnimationObject* inAnimatedSpriteObject, AnimationHandle animation, S32 x, S32 y);
 
@@ -404,9 +398,9 @@ void  Retro_Sprites_SetAnimationObject(AnimationObject* animatedSpriteObject, An
 #if RETRO_NAMESPACES == 1
 const struct RETRO_Sprites
 {
-  SpriteHandle (*loadSprite)(Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h);
-  AnimationHandle (*loadAnimationH)(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
-  AnimationHandle (*loadAnimationV)(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+  SpriteHandle (*loadSprite)(BitmapHandle bitmap, U32 x, U32 y, U32 w, U32 h);
+  AnimationHandle (*loadAnimationH)(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+  AnimationHandle (*loadAnimationV)(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
   void (*newAnimation)(AnimationObject* inAnimatedSpriteObject, AnimationHandle animation, S32 x, S32 y);
   void (*playAnimation)(AnimationObject* animatedSpriteObject, bool playing, bool loop);
   void (*setAnimation)(AnimationObject* animatedSpriteObject, AnimationHandle newAnimation, bool animate);
@@ -477,9 +471,9 @@ typedef enum
 
 void  Retro_Canvas_Presentation(Retro_CanvasPresentation presentation, float alpha, float beta);
 
-void  Retro_Canvas_Copy(Bitmap* bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags);
+void  Retro_Canvas_Copy(BitmapHandle bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags);
 
-void  Retro_Canvas_Copy2(Bitmap* bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags);
+void  Retro_Canvas_Copy2(BitmapHandle bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags);
 
 void  Retro_Canvas_Sprite(SpriteObject* spriteObject);
 
@@ -508,8 +502,8 @@ const struct RETRO_Canvas
   void (*use)(U8 canvasIndex);
   void (*flags)(U8 id, U8 flags, U8 clearColour);
   void (*clear)();
-  void (*copy)(Bitmap* bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags);
-  void (*copy2)(Bitmap* bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags);
+  void (*copy)(BitmapHandle bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags);
+  void (*copy2)(BitmapHandle bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags);
   void (*sprite)(SpriteObject* spriteObject);
   void (*sprite2)(SpriteHandle sprite, S32 x, S32 y, U8 flipFlags);
   void (*animate)(AnimationObject* animationObject, bool updateTiming);
@@ -566,7 +560,7 @@ RETRO_CANVAS_NAMESPACE_NAME
 
 
 
-void  Retro_Audio_PlaySound(Sound* sound, U8 volume);
+void  Retro_Audio_PlaySound(SoundHandle sound, U8 volume);
 
 void  Retro_Audio_ClearSounds();
 
@@ -577,7 +571,7 @@ void  Retro_Audio_StopMusic();
 #if RETRO_NAMESPACES == 1
   const struct RETRO_Audio
   {
-    void (*playSound)(Sound* inSound, U8 volume);
+    void (*playSound)(SoundHandle sound, U8 volume);
     void (*clearSounds)();
     void (*playMusic)(const char* name);
     void (*stopMusic)();
@@ -590,10 +584,10 @@ void  Retro_Audio_StopMusic();
     .stopMusic   = Retro_Audio_StopMusic
   };
 #elif RETRO_NAMESPACES == 0
-#define    Audio_PlaySound(SOUND, U8_volume)              Retro_Audio_PlaySound(SOUND, U8_volume)
-#define    Audio_ClearSounds()                            Retro_Audio_ClearSounds()
-#define    Audio_PlayMusic(CONST_CHAR_name)               Retro_Audio_PlayMusic(CONST_CHAR_name)
-#define    Audio_StopMusic()                              Retro_Audio_StopMusic()
+#define    Audio_PlaySound              Retro_Audio_PlaySound
+#define    Audio_ClearSounds            Retro_Audio_ClearSounds
+#define    Audio_PlayMusic              Retro_Audio_PlayMusic
+#define    Audio_StopMusic              Retro_Audio_StopMusic
 #endif
 
 void  Retro_Palette_Add(Colour colour);
@@ -668,12 +662,12 @@ Colour Retro_Palette_Get(U8 index);
 
   };
 #elif RETRO_NAMESPACES == 0
-#   define  Palette_Add(COLOUR_colour)                Retro_Palette_Add(COLOUR_colour)
-#   define  Palette_Add2(U8_r, U8_g, U8_b)            Retro_Palette_Add2(U8_r, U8_g, U8_b);
-#   define  Palette_AddRGB(U32_argb)                  Retro_Palette_AddARGB(U32_argb)
-#   define  Palette_Index(COLOUR_colour)              Retro_Palette_Index(COLOUR_colour)
-#   define  Palette_Has(COLOUR_colour)                Retro_Palette_Has(COLOUR_colour)
-#   define  Palette_Get(U8_index)                     Retro_Palette_Get(U8_index)
+#   define  Palette_Add            Retro_Palette_Add
+#   define  Palette_Add2           Retro_Palette_Add2
+#   define  Palette_AddRGB         Retro_Palette_AddARGB
+#   define  Palette_Index          Retro_Palette_Index
+#   define  Palette_Has            Retro_Palette_Has
+#   define  Palette_Get            Retro_Palette_Get
 #endif
 
 
@@ -723,14 +717,14 @@ S16   Retro_Input_DeltaAxis(int action);
     .deltaAxis = Retro_Input_DeltaAxis
   };
 #elif RETRO_NAMESPACES == 0
-#   define Input_TextInput(CHAR_str, U32_capacity)         Retro_Input_TextInput(CHAR_str, U32_capacity)
-#   define Input_BindKey(INT_sdlscancode, INT_action)      Retro_Input_BindKey(INT_sdlscancode, INT_action)
-#   define Input_BindAxis(INT_axis, INT_action)            Retro_Input_BindAxis(INT_axis, INT_action)
-#   define Input_Down(INT_action)                          Retro_Input_Down(INT_action)
-#   define Input_Released(INT_action)                      Retro_Input_Released(INT_action)
-#   define Input_Pressed(INT_action)                       Retro_Input_Pressed(INT_action)
-#   define Input_NowAxis(INT_action)                       Retro_Input_NowAxis(INT_action)
-#   define Input_DeltaAxis(INT_action)                     Retro_Input_DeltaAxis(INT_action)
+#   define Input_TextInput           Retro_Input_TextInput
+#   define Input_BindKey             Retro_Input_BindKey
+#   define Input_BindAxis            Retro_Input_BindAxis
+#   define Input_Down                Retro_Input_Down
+#   define Input_Released            Retro_Input_Released
+#   define Input_Pressed             Retro_Input_Pressed
+#   define Input_NowAxis             Retro_Input_NowAxis
+#   define Input_DeltaAxis           Retro_Input_DeltaAxis
 
 #if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
 #define Colour_black 0 

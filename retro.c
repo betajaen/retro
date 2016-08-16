@@ -69,21 +69,37 @@ typedef struct
 
 typedef struct
 {
-  Sound* sound;
+  SDL_Texture*  texture;
+  U8*           imageData;
+  U16           w, h;
+  BitmapHandle  bitmapHandle;
+} RetroP_Bitmap;
+
+typedef struct
+{
+  S32 length;
+  U8* buffer;
+  SDL_AudioSpec spec;
+  SoundHandle soundHandle;
+} RetroP_Sound;
+
+typedef struct
+{
+  RetroP_Sound* sound;
   S32    p;
   U8     volume;
 } Retro_SoundObject;
 
 typedef struct
 {
-  Bitmap*  bitmap;
-  SDL_Rect rect;
-  SpriteHandle spriteHandle;
+  BitmapHandle  bitmap;
+  SDL_Rect      rect;
+  SpriteHandle  spriteHandle;
 } RetroP_Sprite;
 
 typedef struct
 {
-  Bitmap*         bitmap;
+  BitmapHandle    bitmap;
   U8              frameCount;
   U8              w, h;
   U16             frameLength;
@@ -149,6 +165,8 @@ typedef struct
   // Sprites and Animation
   RetroP_Animation             animations[RETRO_MAX_ANIMATIONS];
   RetroP_Sprite                sprites[RETRO_MAX_SPRITES];
+  RetroP_Bitmap                bitmaps[RETRO_MAX_BITMAPS];
+  RetroP_Sound                 sounds[RETRO_MAX_SOUNDS];
 
   // Platform specific
 #ifdef RETRO_BROWSER
@@ -252,8 +270,29 @@ void  Retro_Resources_LoadPalette(const char* name)
   }
 }
 
-void Retro_Resources_LoadBitmap(const char* name, Bitmap* outBitmap, U8 transparentIndex)
+RetroP_Bitmap* RetroP_Bitmap_GetFree()
 {
+  for (U32 i=0;i < RETRO_MAX_ANIMATIONS;i++)
+  {
+    if (RCTX->bitmaps[i].bitmapHandle == 0xFFFF)
+    {
+      RCTX->bitmaps[i].bitmapHandle = i;
+      return &RCTX->bitmaps[i];
+    }
+  }
+  assert(true);
+  return NULL;
+}
+
+RetroP_Bitmap* RetroP_Bitmap_Get(AnimationHandle handle)
+{
+  return &RCTX->bitmaps[handle];
+} 
+
+BitmapHandle Retro_Resources_LoadBitmap(const char* name,  U8 transparentIndex)
+{
+  RetroP_Bitmap* bitmap = RetroP_Bitmap_GetFree();
+
   U32 width, height;
 
   U8* imageData = NULL;
@@ -323,10 +362,12 @@ void Retro_Resources_LoadBitmap(const char* name, Bitmap* outBitmap, U8 transpar
 
   SDL_UnlockTexture(texture);
 
-  outBitmap->w = width;
-  outBitmap->h = height;
-  outBitmap->texture = texture;
-  outBitmap->imageData = imageData;
+  bitmap->w = width;
+  bitmap->h = height;
+  bitmap->texture = texture;
+  bitmap->imageData = imageData;
+
+  return bitmap->bitmapHandle;
 }
 
 RetroP_Sprite* Retro_SpriteHandle_GetFree()
@@ -348,7 +389,7 @@ RetroP_Sprite* RetroP_SpriteHandle_Get(SpriteHandle handle)
   return &RETROP_SPRITES[handle];
 } 
 
-SpriteHandle Retro_Sprites_LoadSprite(Bitmap* bitmap, U32 x, U32 y, U32 w, U32 h)
+SpriteHandle Retro_Sprites_LoadSprite(BitmapHandle bitmap, U32 x, U32 y, U32 w, U32 h)
 {
   assert(bitmap);
 
@@ -382,10 +423,9 @@ RetroP_Animation* Retro_AnimationHandle_Get(AnimationHandle handle)
   return &RETROP_ANIMATIONS[handle];
 } 
 
-AnimationHandle Retro_Animation_Load(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight, S32 frameOffsetX, S32 frameOffsetY)
+AnimationHandle Retro_Animation_Load(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight, S32 frameOffsetX, S32 frameOffsetY)
 {
   assert(numFrames < RETRO_MAX_ANIMATED_SPRITE_FRAMES);
-  assert(bitmap);
 
   RetroP_Animation* animation = RetroP_AnimationHandle_GetFree();
 
@@ -411,12 +451,12 @@ AnimationHandle Retro_Animation_Load(Bitmap* bitmap, U8 numFrames, U8 frameLengt
   return animation->animationHandle;
 }
 
-AnimationHandle  Retro_Sprites_LoadAnimationH(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight)
+AnimationHandle  Retro_Sprites_LoadAnimationH(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight)
 {
   return Retro_Animation_Load(bitmap, numFrames, frameLengthMilliseconds, originX, originY, frameWidth, frameHeight, frameWidth, 0);
 }
 
-AnimationHandle  Retro_Sprites_LoadAnimationV(Bitmap* bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight)
+AnimationHandle  Retro_Sprites_LoadAnimationV(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight)
 {
   return Retro_Animation_Load(bitmap, numFrames, frameLengthMilliseconds, originX, originY, frameWidth, frameHeight, 0, frameHeight);
 }
@@ -447,10 +487,8 @@ void Retro_Canvas_Flags(U8 id, U8 flags, U8 colour)
 
 }
 
-void  Retro_Canvas_Copy(Bitmap* bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags)
+void  Retro_Canvas_Copy(BitmapHandle bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags)
 {
-  assert(bitmap);
-  
   SDL_Rect d, s;
 
   if (dstRectangle == NULL)
@@ -483,7 +521,10 @@ void  Retro_Canvas_Copy(Bitmap* bitmap, Rect* dstRectangle, Rect* srcRectangle, 
     s.h = srcRectangle->h;
   }
 
-  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
+  RetroP_Bitmap* bitmapObject = RetroP_Bitmap_Get(bitmap);
+  assert(bitmapObject);
+
+  SDL_Texture* texture = (SDL_Texture*) bitmapObject->texture;
 
   if (copyFlags == 0)
     SDL_RenderCopy(RCTX->renderer, texture, &s, &d);
@@ -491,7 +532,7 @@ void  Retro_Canvas_Copy(Bitmap* bitmap, Rect* dstRectangle, Rect* srcRectangle, 
     SDL_RenderCopyEx(RCTX->renderer, texture, &s, &d, 0.0f, NULL, (SDL_RendererFlip) copyFlags);
 }
 
-void  Retro_Canvas_Copy2(Bitmap* bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags)
+void  Retro_Canvas_Copy2(BitmapHandle bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags)
 {
   assert(bitmap);
 
@@ -507,7 +548,10 @@ void  Retro_Canvas_Copy2(Bitmap* bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY,
   s.w = w;
   s.h = h;
 
-  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
+  RetroP_Bitmap* bitmapObject = RetroP_Bitmap_Get(bitmap);
+  assert(bitmapObject);
+
+  SDL_Texture* texture = (SDL_Texture*) bitmapObject->texture;
 
   if (copyFlags)
     SDL_RenderCopy(RCTX->renderer, texture, &s, &d);
@@ -1000,7 +1044,12 @@ void Retro_Canvas_Print(S32 x, S32 y, Font* font, U8 colour, const char* str)
   d.w = 0;
   d.h = s.h; 
 
-  RETRO_SDL_TEXTURE_PUSH_RGB(t, font->bitmap.texture, rgb);
+  RetroP_Bitmap* bitmapObject = RetroP_Bitmap_Get(font->bitmap);
+  assert(bitmapObject);
+
+  SDL_Texture* texture = (SDL_Texture*) bitmapObject->texture;
+
+  RETRO_SDL_TEXTURE_PUSH_RGB(t, texture, rgb);
 
   while(true)
   {
@@ -1019,12 +1068,12 @@ void Retro_Canvas_Print(S32 x, S32 y, Font* font, U8 colour, const char* str)
     s.w = font->widths[c];
     d.w = s.w;
 
-    SDL_RenderCopy(RCTX->renderer, (SDL_Texture*) font->bitmap.texture, &s, &d);
+    SDL_RenderCopy(RCTX->renderer, texture, &s, &d);
 
     d.x += d.w;
   }
 
-  RETRO_SDL_TEXTURE_POP_RGB(t, (SDL_Texture*) font->bitmap.texture);
+  RETRO_SDL_TEXTURE_POP_RGB(t, texture);
 
 }
 
@@ -1112,8 +1161,28 @@ void  Retro_Debug(Font* font)
   Retro_Canvas_Printf(0, RCTX->settings.canvasHeight - font->height, font, RCTX->settings.palette.fallback, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), RCTX->fps, RCTX->deltaTime, soundObjectCount, music);
 }
 
-void  Retro_Resources_LoadSound(const char* name, Sound* sound)
+RetroP_Sound* RetroP_Sound_GetFree()
 {
+  for (U32 i=0;i < RETRO_MAX_SOUNDS;i++)
+  {
+    if (RCTX->sounds[i].soundHandle == 0xFFFF)
+    {
+      RCTX->sounds[i].soundHandle = i;
+      return &RCTX->sounds[i];
+    }
+  }
+  assert(true);
+  return NULL;
+}
+
+RetroP_Sound* RetroP_Sound_Get(AnimationHandle handle)
+{
+  return &RCTX->sounds[handle];
+} 
+
+SoundHandle Retro_Resources_LoadSound(const char* name)
+{
+  RetroP_Sound* sound = RetroP_Sound_GetFree();
 
   #ifdef RETRO_WINDOWS
   U32 resourceSize = 0;
@@ -1147,10 +1216,14 @@ void  Retro_Resources_LoadSound(const char* name, Sound* sound)
    // printf("Loaded Audio %s\n", name);
   }
 
+  return sound->soundHandle;
+
 }
 
-void  Retro_Audio_PlaySound(Sound* sound, U8 volume)
+void  Retro_Audio_PlaySound(SoundHandle soundHandle, U8 volume)
 {
+  RetroP_Sound* sound = RetroP_Sound_Get(soundHandle);
+
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
     Retro_SoundObject* soundObj = &RCTX->soundObject[i];
@@ -1307,10 +1380,7 @@ void  Retro_Font_Make(Font* font)
   assert(font);
   memset(font->widths, 0, sizeof(font->widths));
   font->height = 0;
-  font->bitmap.w = 0;
-  font->bitmap.h = 0;
-  font->bitmap.texture = NULL;
-  font->bitmap.imageData = NULL;
+  font->bitmap = 0xFFFF;
 }
 
 void Retro_Resources_LoadFont(const char* name, Font* outFont, Colour markerColour, Colour transparentColour)
@@ -1389,11 +1459,17 @@ void Retro_Resources_LoadFont(const char* name, Font* outFont, Colour markerColo
 
   SDL_UnlockTexture(texture);
 
+  RetroP_Bitmap* bitmap = RetroP_Bitmap_GetFree();
+
+  bitmap->texture = texture;
+  bitmap->w = width;
+  bitmap->h = height;
+  bitmap->imageData = imageData;
+  
+
   outFont->height = height - 1;
-  outFont->bitmap.w = width;
-  outFont->bitmap.h = height - 1;
-  outFont->bitmap.texture = texture;
-  outFont->bitmap.imageData = imageData;
+  outFont->bitmap = bitmap->bitmapHandle;
+
 }
 
 int Retro_Input_TextInput(char* str, U32 capacity)
@@ -1885,8 +1961,14 @@ int main(int argc, char **argv)
   for(U32 i=0;i < RETRO_MAX_ANIMATIONS;i++)
     RETROP_ANIMATIONS[i].animationHandle = 0xFFFF;
 
-  for(U32 i=0;i < RETRO_MAX_ANIMATIONS;i++)
+  for(U32 i=0;i < RETRO_MAX_SPRITES;i++)
     RETROP_SPRITES[i].spriteHandle = 0xFFFF;
+
+  for(U32 i=0;i < RETRO_MAX_BITMAPS;i++)
+    RCTX->bitmaps[i].bitmapHandle = 0xFFFF;
+
+  for(U32 i=0;i < RETRO_MAX_SOUNDS;i++)
+    RCTX->sounds[i].soundHandle = 0xFFFF;
 
   RCTX->window = SDL_CreateWindow( 
     RETRO_WINDOW_CAPTION,
