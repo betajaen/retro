@@ -33,7 +33,7 @@ typedef enum
 
 typedef struct
 {
-  AnimatedSpriteObject player;
+  AnimationObject player;
   Point velocity;
 } GameState;
 
@@ -44,9 +44,11 @@ void Init(Settings* settings)
   settings->windowWidth = 1280;
   settings->windowHeight = 720;
 
-  //palette.load()
+  resources.loadPalette("palette.png");
+  resources.loadBitmap("cave.png", &SPRITESHEET, 0);
 
-  palette.load("palette.png");
+  resources.loadSound("coin.wav", &SOUND_COIN);
+  resources.loadFont("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
 
   input.bindKey(SDL_SCANCODE_W, AC_UP);
   input.bindKey(SDL_SCANCODE_D, AC_RIGHT);
@@ -59,20 +61,16 @@ void Init(Settings* settings)
   input.bindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
   input.bindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
 
-  font.load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
-  Bitmap_Load("cave.png", &SPRITESHEET, 0);
-
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_IDLE, &SPRITESHEET, 1, 100, 0, 80, 16, 16);
   Animation_LoadHorizontal(&ANIMATEDSPRITE_QUOTE_WALK, &SPRITESHEET, 4, 120, 0, 80, 16, 16);
 
-  audio.loadSound("coin.wav", &SOUND_COIN);
 }
 
 void Start()
 {
-  state = Scope_New(GameState);
+  state = Retro_Scope_New(GameState);
 
-  AnimatedSpriteObject_Make(&state->player, &ANIMATEDSPRITE_QUOTE_WALK, Canvas_GetWidth() / 2, Canvas_GetHeight() / 2);
+  AnimatedSpriteObject_Make(&state->player, &ANIMATEDSPRITE_QUOTE_WALK, gSettings.canvasWidth / 2, gSettings.canvasHeight / 2);
   AnimatedSpriteObject_PlayAnimation(&state->player, true, true);
 
   state->velocity.x = 0;
@@ -81,7 +79,7 @@ void Start()
   timer.make(&TIMER);
   timer.start(&TIMER);
 
-  Retro_Audio_PlayMusic("origin.mod");
+  audio.playMusic("origin.mod");
 }
 
 void Step()
@@ -146,9 +144,9 @@ void Step()
     state->player.x = 0;
     state->velocity.x = 0;
   }
-  else if (state->player.x + state->player.w > Canvas_GetWidth())
+  else if (state->player.x + state->player.w > gSettings.canvasWidth)
   {
-    state->player.x = Canvas_GetWidth() - state->player.w;
+    state->player.x = gSettings.canvasWidth - state->player.w;
     state->velocity.x = 0;
   }
 
@@ -167,15 +165,16 @@ void Step()
     }
   }
 
-  Canvas_Set(0);
+  canvas.use(0);
   state->player.x -= 10;
-  Canvas_PlaceAnimated(&state->player, true);
+  canvas.animate(&state->player, true);
   state->player.x += 10;
-  Canvas_Set(1);
-  Canvas_PlaceAnimated(&state->player, true);
+  
+  canvas.use(1);
+  canvas.animate(&state->player, true);
   
   U32 ms = timer.ticks(&TIMER);
-  Canvas_PrintF(10, 10, &FONT_NEOSANS, 15, "%i", ms);
+  canvas.printf(10, 10, &FONT_NEOSANS, 15, "%i", ms);
 
-  Canvas_Debug(&FONT_NEOSANS);
+  Retro_Debug(&FONT_NEOSANS);
 }

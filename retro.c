@@ -113,7 +113,7 @@ U8*                   gMusicFileData;
 #endif
 Animation*            gAnimations[256];
 Sprite*               gSprites[256];
-FramePresentation     gFramePresentation;
+Retro_CanvasPresentation     gFramePresentation;
 float                 gFrameAlpha, gFrameBeta;
 
 typedef union
@@ -140,10 +140,10 @@ typedef union
   SDL_SetTextureColorMod(TEXTURE, T.r, T.g, T.b);
 
 #define RETRO_SDL_TO_RECT(SRC, DST) \
-  DST.x = SRC.left;\
-  DST.y = SRC.top;\
-  DST.w = SRC.right - SRC.left;\
-  DST.h = SRC.bottom - SRC.top;
+  DST.x = SRC.x;\
+  DST.y = SRC.y;\
+  DST.w = SRC.w;\
+  DST.h = SRC.h;
 
 #ifdef RETRO_BROWSER
 
@@ -159,7 +159,7 @@ char gTempBrowserPath[256];
 #endif
 
 
-void* Resource_Load(const char* name, U32* outSize)
+void* Retro_Resource_Load(const char* name, U32* outSize)
 {
 #ifdef RETRO_WINDOWS
   assert(outSize);
@@ -187,7 +187,7 @@ void* Resource_Load(const char* name, U32* outSize)
 }
 
 
-void  Retro_Palette_Load(const char* name)
+void  Retro_Resources_LoadPalette(const char* name)
 {
   U32 width, height;
 
@@ -200,7 +200,7 @@ void  Retro_Palette_Load(const char* name)
 
   #if defined(RETRO_WINDOWS)
     U32 resourceSize = 0;
-    void* resourceData = Resource_Load(name, &resourceSize);
+    void* resourceData = Retro_Resource_Load(name, &resourceSize);
     lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
   #elif defined(RETRO_BROWSER)
     RETRO_MAKE_BROWSER_PATH(name);
@@ -226,8 +226,7 @@ void  Retro_Palette_Load(const char* name)
   }
 }
 
-
-void Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset)
+void Retro_Resources_LoadBitmap(const char* name, Bitmap* outBitmap, U8 transparentIndex)
 {
   U32 width, height;
 
@@ -235,49 +234,7 @@ void Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, U8 colourOffset)
 
 #ifdef RETRO_WINDOWS
   U32 resourceSize = 0;
-  void* resourceData = Resource_Load(name, &resourceSize);
-  lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
-#elif defined(RETRO_BROWSER)
-  RETRO_MAKE_BROWSER_PATH(name);
-  lodepng_decode_file(&imageData, &width, &height, RETRO_BROWSER_PATH, LCT_RGB, 8);
-#endif
-
-  assert(imageData);
-  
-  SDL_Texture* texture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
-
-  void* pixelsVoid;
-  int pitch;
-  SDL_LockTexture(texture, NULL, &pixelsVoid, &pitch);
-  U8* pixels = (U8*) pixelsVoid;
-
-  for(U32 i=0, j=0;i < width * height;++i, j+=3)
-  {
-    U32 idx = (imageData[i] + colourOffset) & 0xFF;
-    Colour colour = Retro_Palette_Get(idx);
-
-    pixels[j+0] = colour.r;
-    pixels[j+1] = colour.g;
-    pixels[j+2] = colour.b;
-  }
-
-  SDL_UnlockTexture(texture);
-
-  outBitmap->w = width;
-  outBitmap->h = height;
-  outBitmap->texture = texture;
-  outBitmap->imageData = imageData;
-}
-
-void Bitmap_Load(const char* name, Bitmap* outBitmap, U8 transparentIndex)
-{
-  U32 width, height;
-
-  U8* imageData = NULL;
-
-#ifdef RETRO_WINDOWS
-  U32 resourceSize = 0;
-  void* resourceData = Resource_Load(name, &resourceSize);
+  void* resourceData = Retro_Resource_Load(name, &resourceSize);
   lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
 #elif defined(RETRO_BROWSER)
   RETRO_MAKE_BROWSER_PATH(name);
@@ -414,7 +371,7 @@ void Retro_Animation_Load(Animation* inAnimation, Bitmap* bitmap, U8 numFrames, 
   inAnimation->h = frameHeight;
   inAnimation->animationHandle = animationHandle;
 
-  SDL_Rect frame;
+  Rect frame;
   frame.x = originX;
   frame.y = originY;
   frame.w = frameWidth;
@@ -439,38 +396,19 @@ void  Animation_LoadVertical(Animation* inAnimatedSprite, Bitmap* bitmap, U8 num
   Retro_Animation_Load(inAnimatedSprite, bitmap, numFrames, frameLengthMilliseconds, originX, originY, frameWidth, frameHeight, 0, frameHeight);
 }
 
-Size  Screen_GetSize()
-{
-  Size size;
-  size.w = gSettings.windowWidth;
-  size.h = gSettings.windowHeight;
-  return size;
-}
-
-void Canvas_SetSize(Size size)
-{
-  gCanvasSize.w = size.w;
-  gCanvasSize.h = size.h;
-}
-
-S32 Canvas_GetWidth()
-{
-  return gCanvasSize.w;
-}
-
-S32 Canvas_GetHeight()
-{
-  return gCanvasSize.h;
-}
-
-void Canvas_Set(U8 id)
+void Retro_Canvas_Use(U8 id)
 {
   assert(id < RETRO_CANVAS_COUNT);
   gCanvasTexture = gCanvasTextures[id];
   SDL_SetRenderTarget(gRenderer, gCanvasTexture);
 }
 
-void Canvas_SetFlags(U8 id, U8 flags, U8 colour)
+void Retro_Canvas_Clear()
+{
+  SDL_RenderClear(gRenderer);
+}
+
+void Retro_Canvas_Flags(U8 id, U8 flags, U8 colour)
 {
   assert(id < RETRO_CANVAS_COUNT);
 
@@ -484,161 +422,173 @@ void Canvas_SetFlags(U8 id, U8 flags, U8 colour)
 
 }
 
-void Canvas_Splat(Bitmap* bitmap, S32 x, S32 y, Rect* srcRectangle)
+void  Retro_Canvas_Copy(Bitmap* bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags)
 {
-  SDL_Rect src, dst;
-  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
+  assert(bitmap);
+  
+  SDL_Rect d, s;
 
-  if (srcRectangle == NULL)
+  if (dstRectangle == NULL)
   {
-    src.x = 0;
-    src.y = 0;
-    src.w = bitmap->w;
-    src.h = bitmap->h;
+    d.x = 0;
+    d.y = 0;
+    d.w = gSettings.canvasWidth;
+    d.h = gSettings.canvasHeight;
   }
   else
   {
-    src.x = srcRectangle->left;
-    src.y = Rect_GetWidth(srcRectangle);
-    src.w = srcRectangle->top;
-    src.h = Rect_GetHeight(srcRectangle);
+    d.x = dstRectangle->x;
+    d.y = dstRectangle->y;
+    d.w = dstRectangle->w;
+    d.h = dstRectangle->h;
   }
 
-  dst.x = x;
-  dst.y = y;
-  dst.w = src.w;
-  dst.h = src.h;
-
-  SDL_RenderCopy(gRenderer, texture, &src, &dst);
-}
-
-void  Canvas_Splat2(Bitmap* bitmap, S32 x, S32 y, SDL_Rect* srcRectangle)
-{
-  assert(srcRectangle);
-
-  SDL_Rect dst;
-  SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
-
-  dst.x = x;
-  dst.y = y;
-  dst.w = srcRectangle->w;
-  dst.h = srcRectangle->h;
-
-  SDL_RenderCopy(gRenderer, texture, srcRectangle, &dst);
-}
-
-void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle)
-{
-  assert(srcRectangle);
+  if (srcRectangle == NULL)
+  {
+    s.x = 0;
+    s.y = 0;
+    s.w = gSettings.canvasWidth;
+    s.h = gSettings.canvasHeight;
+  }
+  else
+  {
+    s.x = srcRectangle->x;
+    s.y = srcRectangle->y;
+    s.w = srcRectangle->w;
+    s.h = srcRectangle->h;
+  }
 
   SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
-  SDL_RenderCopy(gRenderer, texture, srcRectangle, dstRectangle);
+
+  if (copyFlags == 0)
+    SDL_RenderCopy(gRenderer, texture, &s, &d);
+  else
+    SDL_RenderCopyEx(gRenderer, texture, &s, &d, 0.0f, NULL, (SDL_RendererFlip) copyFlags);
 }
 
-void Canvas_SplatFlip(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, U8 flipFlags)
+void  Retro_Canvas_Copy2(Bitmap* bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags)
 {
-  assert(srcRectangle);
+  assert(bitmap);
+
+  SDL_Rect d, s;
+
+  d.x = dstX;
+  d.y = dstY;
+  d.w = w;
+  d.h = h;
+
+  s.x = srcX;
+  s.y = srcY;
+  s.w = w;
+  s.h = h;
 
   SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
-  SDL_RenderCopyEx(gRenderer, texture, srcRectangle, dstRectangle, 0.0f, NULL, flipFlags);
+
+  if (copyFlags)
+    SDL_RenderCopy(gRenderer, texture, &s, &d);
+  else
+    SDL_RenderCopyEx(gRenderer, texture, &s, &d, 0.0f, NULL, (SDL_RendererFlip) copyFlags);
 }
 
-void Canvas_Place(StaticSpriteObject* spriteObject)
+void Retro_Canvas_Sprite(SpriteObject* spriteObject)
 {
   assert(spriteObject);
   Sprite* sprite = SpriteHandle_Get(spriteObject->spriteHandle);
-
-  Canvas_Splat2(sprite->bitmap, spriteObject->x, spriteObject->y, &sprite->rect);
-}
-
-void Canvas_Place2(Sprite* sprite, S32 x, S32 y)
-{
   assert(sprite);
-  Canvas_Splat2(sprite->bitmap, x, y, &sprite->rect);
+
+  Rect d;
+  d.x = spriteObject->x;
+  d.y = spriteObject->y;
+  d.w = sprite->rect.w;
+  d.h = sprite->rect.h;
+
+  Rect s;
+  s.x = sprite->rect.x;
+  s.y = sprite->rect.y;
+  s.w = sprite->rect.w;
+  s.h = sprite->rect.h;
+
+  Retro_Canvas_Copy(sprite->bitmap, &d, &s, spriteObject->flags);
 }
 
-void Canvas_PlaceAnimated(AnimatedSpriteObject* spriteObject, bool updateTiming)
+void  Retro_Canvas_Sprite2(SpriteHandle spriteHandle, S32 x, S32 y, U8 copyFlags)
 {
-  Animation* animation = AnimationHandle_Get(spriteObject->animationHandle);
+  Sprite* sprite = SpriteHandle_Get(spriteHandle);
+  assert(sprite);
 
-  if (updateTiming && (spriteObject->flags & SOF_Animation) != 0)
+  Rect d;
+  d.x = x;
+  d.y = y;
+  d.w = sprite->rect.w;
+  d.h = sprite->rect.h;
+
+  Rect s;
+  s.x = sprite->rect.x;
+  s.y = sprite->rect.y;
+  s.w = sprite->rect.w;
+  s.h = sprite->rect.h;
+
+  Retro_Canvas_Copy(sprite->bitmap, &d, &s, copyFlags);
+}
+
+void  Retro_Canvas_Animate(AnimationObject* animationObject, bool updateTiming)
+{
+  Animation* animation = AnimationHandle_Get(animationObject->animationHandle);
+  assert(animation);
+
+  if (updateTiming && (animationObject->flags & SOF_Animation) != 0)
   {
-    spriteObject->frameTime += gDeltaTime;
+    animationObject->frameTime += gDeltaTime;
 
-    if (spriteObject->frameTime >= 1000)
-      spriteObject->frameTime = 0; // Prevent spiral out of control.
+    if (animationObject->frameTime >= 1000)
+      animationObject->frameTime = 0; // Prevent spiral out of control.
 
 
-    while(spriteObject->frameTime > animation->frameLength)
+    while(animationObject->frameTime > animation->frameLength)
     {
-      spriteObject->frameNumber++;
-      spriteObject->frameTime -= animation->frameLength;
+      animationObject->frameNumber++;
+      animationObject->frameTime -= animation->frameLength;
 
-      if (spriteObject->frameNumber >= animation->frameCount)
+      if (animationObject->frameNumber >= animation->frameCount)
       {
-        if (spriteObject->flags & SOF_AnimationOnce)
+        if (animationObject->flags & SOF_AnimationOnce)
         {
-          spriteObject->flags &= ~SOF_Animation;
-          spriteObject->frameNumber = animation->frameCount - 1; // Stop
+          animationObject->flags &= ~SOF_Animation;
+          animationObject->frameNumber = animation->frameCount - 1; // Stop
           break;
         }
         else
         {
-          spriteObject->frameNumber = 0; // Loop around.
+          animationObject->frameNumber = 0; // Loop around.
         }
       }
     }
   }
 
-  assert(spriteObject->frameNumber < animation->frameCount);
-  Canvas_PlaceAnimated2(animation, spriteObject->x, spriteObject->y, spriteObject->frameNumber, spriteObject->flags & FF_Mask);
+  assert(animationObject->frameNumber < animation->frameCount);
+
+  Retro_Canvas_Animate2(animationObject->animationHandle, animationObject->x, animationObject->y, animationObject->frameNumber, animationObject->flags);
 }
 
-void Canvas_PlaceAnimated2(Animation* animatedSprite, S32 x, S32 y, U8 frame, U8 flipFlags)
+void  Retro_Canvas_Animate2(AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags)
 {
-  assert(animatedSprite);
-  assert(frame < animatedSprite->frameCount);
-  SDL_Rect src = animatedSprite->frames[frame];
-  SDL_Rect dst;
+  Animation* animation = AnimationHandle_Get(animationHandle);
+  assert(animation);
+  assert(frame < animation->frameCount);
+
+  Rect src = animation->frames[frame];
+  Rect dst;
   dst.x = x;
   dst.y = y;
   dst.w = src.w;
   dst.h = src.h;
-  Canvas_SplatFlip(animatedSprite->bitmap, &dst, &src, flipFlags & FF_Mask);
+
+  Retro_Canvas_Copy(animation->bitmap, &dst, &src, copyFlags);
 }
 
-void Canvas_PlaceScaled(Sprite* sprite, U32 x, U32 y, U32 scale)
-{
-  assert(sprite);
-  SDL_Rect dst;
-  dst.x = x;
-  dst.y = y;
-  dst.w = sprite->rect.w * scale;
-  dst.h = sprite->rect.h * scale;
-
-  Canvas_Splat3(sprite->bitmap, &dst, &sprite->rect);
-}
-
-void Canvas_PlaceScaledF(Sprite* sprite, U32 x, U32 y, float scale)
-{
-  assert(sprite);
-  SDL_Rect dst;
-  dst.x = x;
-  dst.y = y;
-  dst.w = sprite->rect.w * scale;
-  dst.h = sprite->rect.h * scale;
-
-  Canvas_Splat3(sprite->bitmap, &dst, &sprite->rect);
-}
-
-void Canvas_Flip()
+void Retro_Canvas_Flip()
 {
   SDL_RenderPresent(gRenderer);
-}
-
-void Canvas_Clear()
-{
-  SDL_RenderClear(gRenderer);
 }
 
 void  Retro_Palette_MakeImpl(Palette* palette)
@@ -903,7 +853,7 @@ void Arena_LoadFromMem(U8* mem, bool loadMusic)
 
 }
 
-void Scope_Push(int name)
+void Retro_Scope_Push(int name)
 {
   assert(gScopeStackIndex < 256);
 
@@ -914,49 +864,49 @@ void Scope_Push(int name)
   scope->p = Arena_Current();
 }
 
-int Scope_GetName()
+int Retro_Scope_Name()
 {
   ScopeStack* scope = &gScopeStack[gScopeStackIndex];
   return scope->name;
 }
 
-U8* Scope_Obtain(U32 size)
+U8* Retro_Scope_Obtain(U32 size)
 {
   ScopeStack* scope = &gScopeStack[gScopeStackIndex];
   assert(scope->p + size < RETRO_ARENA_SIZE); // Ensure can fit.
   return Arena_Obtain(size);
 }
 
-void Scope_Rewind()
+void Retro_Scope_Rewind()
 {
   ScopeStack* scope = &gScopeStack[gScopeStackIndex];
   Arena_RewindU32(scope->p);
 }
 
-void Scope_Pop()
+void Retro_Scope_Pop()
 {
   assert(gScopeStackIndex > 0);
-  Scope_Rewind();
+  Retro_Scope_Rewind();
   --gScopeStackIndex;
 }
 
-void Canvas_DrawPalette(Palette* palette, U32 Y)
+void Retro_Canvas_DrawPalette(S32 Y)
 {
-  int w = Canvas_GetWidth() / 16;
+  int w = gSettings.canvasHeight / 16;
   int h = 8;
 
   int x = 0;
   int y = 0;
 
-  for(int i=0;i < palette->count;i++)
+  for(int i=0;i < gSettings.palette.count;i++)
   {
     Rect rect;
-    rect.left = x;
-    rect.top = y;
-    rect.right = x + w;
-    rect.bottom = y + h;
+    rect.x = x;
+    rect.y = y;
+    rect.w = w;
+    rect.y = h;
 
-    Canvas_DrawFilledRectangle(i, rect);
+    Retro_Canvas_DrawRectangle(i, rect);
 
     if (i > 0 && i % 16 == 0)
     {
@@ -971,7 +921,7 @@ void Canvas_DrawPalette(Palette* palette, U32 Y)
   
 }
 
-void Canvas_DrawRectangle(U8 colour, Rect rect)
+void Retro_Canvas_DrawBox(U8 colour, Rect rect)
 {
   Colour rgb = Retro_Palette_Get(colour);
   SDL_Rect dst;
@@ -984,7 +934,7 @@ void Canvas_DrawRectangle(U8 colour, Rect rect)
   RETRO_SDL_DRAW_POP_RGB(t);
 }
 
-void Canvas_DrawFilledRectangle(U8 colour, Rect rect)
+void Retro_Canvas_DrawRectangle(U8 colour, Rect rect)
 {
   Colour rgb = Retro_Palette_Get(colour);
   SDL_Rect dst;
@@ -999,7 +949,7 @@ void Canvas_DrawFilledRectangle(U8 colour, Rect rect)
 
 char* gFmtScratch;
 
-void Canvas_PrintStr(U32 x, U32 y, Font* font, U8 colour, const char* str)
+void Retro_Canvas_Print(S32 x, S32 y, Font* font, U8 colour, const char* str)
 {
   assert(font);
   assert(str);
@@ -1044,7 +994,7 @@ void Canvas_PrintStr(U32 x, U32 y, Font* font, U8 colour, const char* str)
 
 }
 
-void Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...)
+void Retro_Canvas_Printf(S32 x, S32 y, Font* font, U8 colour, const char* fmt, ...)
 {
   assert(font);
   assert(fmt);
@@ -1053,17 +1003,17 @@ void Canvas_PrintF(U32 x, U32 y, Font* font, U8 colour, const char* fmt, ...)
   vsprintf(gFmtScratch, fmt, args);
   va_end(args);
 
-  Canvas_PrintStr(x, y, font, colour, gFmtScratch);
+  Retro_Canvas_Print(x, y, font, colour, gFmtScratch);
 }
 
-void Canvas_SetPresentation(FramePresentation presentation, float alpha, float beta)
+void Retro_Canvas_Presentation(Retro_CanvasPresentation presentation, float alpha, float beta)
 {
   gFramePresentation = presentation;
   gFrameAlpha = alpha;
   gFrameBeta = beta;
 }
 
-void AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y)
+void AnimatedSpriteObject_Make(AnimationObject* inAnimatedSpriteObject, Animation* animation, S32 x, S32 y)
 {
   assert(inAnimatedSpriteObject);
 
@@ -1077,7 +1027,7 @@ void AnimatedSpriteObject_Make(AnimatedSpriteObject* inAnimatedSpriteObject, Ani
   inAnimatedSpriteObject->y = y;
 }
 
-void AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* inAnimatedSpriteObject, bool playing, bool loop)
+void AnimatedSpriteObject_PlayAnimation(AnimationObject* inAnimatedSpriteObject, bool playing, bool loop)
 {
   assert(inAnimatedSpriteObject);
 
@@ -1093,7 +1043,7 @@ void AnimatedSpriteObject_PlayAnimation(AnimatedSpriteObject* inAnimatedSpriteOb
 
 }
 
-void AnimatedSpriteObject_SwitchAnimation(AnimatedSpriteObject* animatedSpriteObject, Animation* newAnimation, bool animate)
+void AnimatedSpriteObject_SwitchAnimation(AnimationObject* animatedSpriteObject, Animation* newAnimation, bool animate)
 {
   assert(animatedSpriteObject);
   assert(newAnimation);
@@ -1106,11 +1056,11 @@ void AnimatedSpriteObject_SwitchAnimation(AnimatedSpriteObject* animatedSpriteOb
   animatedSpriteObject->frameNumber = 0;
 }
 
-void  Canvas_Debug(Font* font)
+void  Retro_Debug(Font* font)
 {
   assert(font);
   RetroFourByteUnion f;
-  f.q = Scope_GetName();
+  f.q = Retro_Scope_Name();
   
   U32 soundObjectCount = 0;
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
@@ -1128,15 +1078,15 @@ void  Canvas_Debug(Font* font)
     music = (int) 100 - (((float) gMusicContext->samples_remaining / (float) gMusicContext->length) *100.0f);
   }
 
-  Canvas_PrintF(0, Canvas_GetHeight() - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount, music);
+  Retro_Canvas_Printf(0, gSettings.canvasHeight - font->height, font, 1, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), gFps, gDeltaTime, soundObjectCount, music);
 }
 
-void  Retro_Audio_LoadSound(const char* name, Sound* sound)
+void  Retro_Resources_LoadSound(const char* name, Sound* sound)
 {
 
   #ifdef RETRO_WINDOWS
   U32 resourceSize = 0;
-  void* resource = Resource_Load(name, &resourceSize);
+  void* resource = Retro_Resource_Load(name, &resourceSize);
   SDL_LoadWAV_RW(SDL_RWFromConstMem(resource, resourceSize), 0, &sound->spec, &sound->buffer, &sound->length);
   #else
   RETRO_MAKE_BROWSER_PATH(name);
@@ -1210,7 +1160,7 @@ void Retro_Audio_PlayMusic(const char* name)
   U32 dataLength = 0;
 
 #ifdef RETRO_WINDOWS
-  data = Resource_Load(name, &dataLength);
+  data = Retro_Resource_Load(name, &dataLength);
 #endif
 
 #ifdef RETRO_BROWSER
@@ -1332,7 +1282,7 @@ void  Retro_Font_Make(Font* font)
   font->bitmap.imageData = NULL;
 }
 
-void Retro_Font_Load(const char* name, Font* outFont, Colour markerColour, Colour transparentColour)
+void Retro_Resources_LoadFont(const char* name, Font* outFont, Colour markerColour, Colour transparentColour)
 {
   U32 width, height;
 
@@ -1340,7 +1290,7 @@ void Retro_Font_Load(const char* name, Font* outFont, Colour markerColour, Colou
 
 #ifdef RETRO_WINDOWS
   U32 resourceSize = 0;
-  void* resourceData = Resource_Load(name, &resourceSize);
+  void* resourceData = Retro_Resource_Load(name, &resourceSize);
   lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
 #elif defined(RETRO_BROWSER)
   RETRO_MAKE_BROWSER_PATH(name);
@@ -1838,22 +1788,22 @@ void Frame()
   {
     if (gCanvasFlags[i] & CNF_Clear)
     {
-      Canvas_Set(i);
+      Retro_Canvas_Use(i);
       Colour col = Retro_Palette_Get(gCanvasBackgroundColour[i]);
       SDL_SetRenderDrawColor(gRenderer, col.r, col.g, col.b, 0x00);
-      Canvas_Clear();
+      Retro_Canvas_Clear();
       SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0x00);
     }
   }
 
-  Canvas_Set(0);
+  Retro_Canvas_Use(0);
   
   Step();
   SDL_SetRenderTarget(gRenderer, NULL);
 
   Canvas_Present();
 
-  Canvas_Flip();
+  Retro_Canvas_Flip();
   
   ++gCountedFrames;
   
@@ -1888,6 +1838,8 @@ int main(int argc, char **argv)
 
   gSettings.windowWidth = RETRO_WINDOW_DEFAULT_WIDTH;
   gSettings.windowHeight = RETRO_WINDOW_DEFAULT_HEIGHT;
+  gSettings.canvasWidth = RETRO_CANVAS_DEFAULT_WIDTH;
+  gSettings.canvasHeight = RETRO_CANVAS_DEFAULT_HEIGHT;
   
   Retro_Palette_MakeImpl(&gSettings.palette);
 
@@ -1956,10 +1908,10 @@ int main(int argc, char **argv)
     if (i > 0)
       flags |= CNF_Blend;
 
-    Canvas_SetFlags(i, flags, 0);
+    Retro_Canvas_Flags(i, flags, 0);
   }
 
-  Canvas_Set(0);
+  Retro_Canvas_Use(0);
 
   gQuit = false;
 
