@@ -171,5 +171,4 @@ void Step()
   canvas.printf(10, 10, &FONT_NEOSANS, palette.peach, "%i", ms);
 
   Retro_Debug(&FONT_NEOSANS);
-
 }

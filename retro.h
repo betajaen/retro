@@ -99,8 +99,14 @@
 #endif
 
 #ifndef RETRO_API
-#ifdef RETRO_WINDOWS
-#define RETRO_API extern
+#if defined(RETRO_WINDOWS)
+#if defined(RETRO_IS_LIBRARY)
+#define RETRO_API __declspec(dllexport) extern
+#elif defined(RETRO_LIBRARY)
+#define RETRO_API __declspec(dllimport) extern
+#else
+#define RETRO_API
+#endif
 #else
 #define RETRO_API
 #endif
@@ -155,8 +161,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-
-#include "SDL.h"
 
 typedef uint8_t  U8;
 typedef uint16_t U16;
@@ -292,10 +296,77 @@ RETRO_API Rect   Rect_Make(S32 x, S32 y, S32 w, S32 h);
 
 
 
+typedef struct
+{
+  const char* caption;
+  U32         windowWidth, windowHeight;
+  U32         canvasWidth, canvasHeight;
+  int         defaultPalette;
+  float       soundVolume;
+  U32         frameRate;
+  U32         arenaSize;
+  U16         maxInputActions;
+  U16         maxInputBindings;
+  U16         maxAnimatedSpriteFrames;
+  U16         maxBitmaps;
+  U16         maxSounds;
+  U16         maxAnimations;
+  U16         maxSprites;
+  U8          canvasCount;
+  U8          maxSoundObjects;
+  U16         audioFrequency;
+  U8          audioChannels;
+  U32         audioSamples;
+} Retro_Initialiser;
 
+const Retro_Initialiser Retro_Default_Initialiser = {
+  .caption                 = RETRO_WINDOW_CAPTION,
+  .windowWidth             = RETRO_WINDOW_DEFAULT_WIDTH,
+  .windowHeight            = RETRO_WINDOW_DEFAULT_HEIGHT,
+  #ifdef RETRO_DEFAULT_PALETTE
+  .defaultPalette          = RETRO_DEFAULT_PALETTE,
+  #else
+  .defaultPalette          = 0,
+  #endif
+  .canvasWidth             = RETRO_CANVAS_DEFAULT_WIDTH,
+  .canvasHeight            = RETRO_CANVAS_DEFAULT_HEIGHT,
+  .soundVolume             = RETRO_SOUND_DEFAULT_VOLUME,
+  .frameRate               = RETRO_FRAME_RATE,
+  .arenaSize               = RETRO_ARENA_SIZE,
+  .maxInputActions         = RETRO_MAX_INPUT_ACTIONS,
+  .maxInputBindings        = RETRO_MAX_INPUT_BINDINGS,
+  .maxAnimatedSpriteFrames = RETRO_MAX_ANIMATED_SPRITE_FRAMES,
+  .maxBitmaps              = RETRO_MAX_BITMAPS,
+  .maxSounds               = RETRO_MAX_SOUNDS,
+  .maxAnimations           = RETRO_MAX_ANIMATIONS,
+  .maxSprites              = RETRO_MAX_SPRITES,
+  .canvasCount             = RETRO_CANVAS_COUNT,
+  .maxSoundObjects         = RETRO_MAX_SOUND_OBJECTS,
+  .audioFrequency          = RETRO_AUDIO_FREQUENCY,
+  .audioChannels           = RETRO_AUDIO_CHANNELS,
+  .audioSamples            = RETRO_AUDIO_SAMPLES
+};
 
+RETRO_API int  StartRetro(Retro_Initialiser* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)());
+RETRO_API void ShutdownRetro();
 
+#if !(defined(RETRO_IS_LIBRARY) || defined(RETRO_LIBRARY))
 
+void  Init();
+void  Start();
+void  Step();
+
+#ifndef RETRO_NO_MAIN
+int main(int argc, char *argv[])
+{
+  Retro_Initialiser initialiser = Retro_Default_Initialiser;
+  StartRetro(&initialiser, Init, Start, Step);
+  ShutdownRetro();
+  return 0;
+}
+#endif
+
+#endif
 
 
 
@@ -490,9 +561,9 @@ typedef enum
 
 typedef enum
 {
-  CC_None     = SDL_FLIP_NONE,
-  CC_FlipHorz = SDL_FLIP_HORIZONTAL,
-  CC_FlipVert = SDL_FLIP_VERTICAL,
+  CC_None     = 0,
+  CC_FlipHorz = 1,
+  CC_FlipVert = 2,
   CC_FlipDiag = CC_FlipHorz | CC_FlipVert,
   CC_Mask     = CC_FlipHorz | CC_FlipVert
 } Retro_CanvasCopyFlags;
@@ -875,16 +946,5 @@ RETRO_API bool  Retro_Timer_Paused(Timer* timer);
 #   define Timer_Started(TIMER)   Retro_Timer_Started(TIMER)
 #   define Timer_Paused(TIMER)    Retro_Timer_Paused(TIMER)
 #endif
-
-
-
-
-
-RETRO_API void  Init();
-
-RETRO_API void  Start();
-
-RETRO_API void  Step();
-
 
 #endif

@@ -23,11 +23,11 @@ solution "Retro"
           objdir          "_build"
           flags           { "FatalWarnings", "NoExceptions", "NoRTTI" }
           defines         { "RETRO_IS_LIBRARY" }
-          links           { "SDL2", "SDL2main" }
+          links           { "SDL2" }
           includedirs     { "ref/SDL2/include", "ref/" }
           libdirs         { "ref/SDL2/lib/x86/" }
           
-          files           { "retro.c", "ref/*.c", "ref/*.h" }
+          files           { "retro.c", "retro.h", "ref/*.c", "ref/*.h" }
           excludes        { "ref/*.c", "ref/*.h" }
 
       --------------------------------------------------------------------------
@@ -38,7 +38,7 @@ solution "Retro"
           objdir          "_build"
           flags           { "FatalWarnings", "NoExceptions", "NoRTTI" }
           defines         { }
-          links           { "SDL2", "SDL2main", "LibRetro" }
+          links           { "LibRetro" }
           includedirs     { "ref/SDL2/include", "ref/" }
           libdirs         { "ref/SDL2/lib/x86/" }
           
@@ -53,12 +53,12 @@ solution "Retro"
           objdir          "_build"
           flags           { "FatalWarnings", "NoExceptions", "NoRTTI", "WinMain" }
           defines         { }
-          links           { "SDL2", "SDL2main" }
-          includedirs     { "ref/SDL2/include", "ref/" }
-          libdirs         { "ref/SDL2/lib/x86/" }
+          links           { "LibRetro" }
+          includedirs     { }
+          libdirs         { }
           
-          files           { "retro.c", "retro.h", "editor/editor.c", "editor/*.c", "editor/*.h", "ref/*.c", "ref/*.h", "editor/editor_resources.rc", "editor/assets/*.png", "editor/assets/*.wav", "editor/assets/*.mod" }
-          excludes        { "retro.c", "ref/*.c", "ref/*.h" }
+          files           { "retro.h", "editor/*.c", "editor/*.h", "editor/editor_resources.rc", "editor/assets/*.png", "editor/assets/*.wav", "editor/assets/*.mod" }
+          excludes        { }
 
       --------------------------------------------------------------------------
 

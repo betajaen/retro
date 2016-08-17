@@ -4,8 +4,10 @@
 #define RETRO_CANVAS_DEFAULT_WIDTH 640
 #define RETRO_CANVAS_DEFAULT_HEIGHT 360
 #define RETRO_SHORTHAND
+#define RETRO_LIBRARY
+#include "../retro.h"
 
-#include "../retro.c"
+#include <string.h>
 
 #define FONT_WIDTH       7
 #define FONT_HEIGHT      13
@@ -69,5 +71,14 @@ void Step()
   Editor_Button(1 + UI_LastRight, 1, "Play");
   Editor_Button(1 + UI_LastRight, 1, "Pause");
   Editor_Button(1 + UI_LastRight, 1, "Stop");
+}
 
+int main(int argc, char *argv[])
+{
+  Retro_Initialiser initialiser = Retro_Default_Initialiser;
+  initialiser.windowWidth = 1280;
+  initialiser.windowHeight = 720;
+  StartRetro(&initialiser, Init, Start, Step);
+  ShutdownRetro();
+  return 0;
 }
