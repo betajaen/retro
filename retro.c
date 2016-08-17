@@ -740,6 +740,20 @@ Colour Retro_Palette_Get(U8 index)
   return ((palette)->colours[index >= (palette)->count ? (palette)->fallback : index]);
 }
 
+void Retro_Palette_Set(U8 index, Colour colour)
+{
+  Palette* palette = &RCTX->settings.palette;
+  palette->colours[index] = colour;
+  palette->count = Retro_Max(palette->count, (index + 1));
+}
+
+void Retro_Palette_Set2(U8 index, U8 r, U8 g, U8 b)
+{
+  Palette* palette = &RCTX->settings.palette;
+  palette->colours[index] = Colour_Make(r, g, b);
+  palette->count = Retro_Max(palette->count, (index + 1));
+}
+
 void Retro_Palette_Copy(const Palette* src, Palette* dst)
 {
   assert(src);
@@ -751,6 +765,80 @@ void Retro_Palette_Copy(const Palette* src, Palette* dst)
   memcpy(dst->colours, src->colours, sizeof(src->colours));
 }
 
+U8     Hex_Char(char c)
+{
+  c = tolower(c);
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  return 0;
+}
+
+U8     Hex_U8(const char* str)
+{
+  char a = str[0], b = str[1];
+  
+  if (b == '\0')
+    return 0;
+  else if (a == '\0')
+    return Hex_Char(a);
+  else
+    return (Hex_Char(a) << 4) | Hex_Char(b);
+}
+
+S8     Hex_S8(const char* str)
+{
+  char a = str[0], b = str[1];
+
+  if (a == '\0')
+    return 0;
+  else if (b == '\0')
+    return Hex_Char(a);
+  else
+    return Hex_Char(a) + Hex_Char(b) * 16;
+}
+
+U16    Hex_U16(const char* str)
+{
+  U16 v = 0;
+  while(*str != '\0')
+  {
+    v = (v << 4) | Hex_Char(*str);
+  }
+  return v;
+}
+
+S16    Hex_S16(const char* str)
+{
+  U16 v = 0;
+  while(*str != '\0')
+  {
+    v = (v << 4) | Hex_Char(*str);
+  }
+  return v;
+}
+
+U32    Hex_U32(const char* str)
+{
+  U16 v = 0;
+  while(*str != '\0')
+  {
+    v = (v << 4) | Hex_Char(*str);
+  }
+  return v;
+}
+
+S32    Hex_S32(const char* str)
+{
+  U16 v = 0;
+  while(*str != '\0')
+  {
+    v = (v << 4) | Hex_Char(*str);
+  }
+  return v;
+}
+
 Colour Colour_Make(U8 r, U8 g, U8 b)
 {
   Colour c;
@@ -758,6 +846,68 @@ Colour Colour_Make(U8 r, U8 g, U8 b)
   c.g = g;
   c.b = b;
   return c;
+}
+
+Colour Hex_Colour(const char* str)
+{
+  Colour c;
+  c.r = 0;
+  c.g = 0;
+  c.b = 0;
+
+  if (str == NULL)  // 0 => 0, 0, 0
+    return c;
+
+  int n = strlen(str);
+
+  if (n == 1)       // R => Rr, Gg, Bb
+  {
+    U8 x = Hex_Char(str[0]) * 16;
+    c.r = x;
+    c.g = x;
+    c.b = x;
+  }
+  else if (n == 2)  // Rr = Rr, Rr, Rr
+  {
+    U8 x = Hex_U8(str);
+    c.r = x;
+    c.g = x;
+    c.b = x;
+  }
+  else if (n == 3)  // RGB = Rr, Gg, Bb
+  {
+    c.r = Hex_Char(str[0]);
+    c.g = Hex_Char(str[1]);
+    c.b = Hex_Char(str[2]);
+  }
+  else if (n == 4)  // RrGg =  0, 0, 0
+  {
+  }
+  else if (n == 5)  // RrGgB = 0, 0, 0
+  {
+  }
+  else if (n == 6)  // RrGgBb = Rr, Gg, Bb
+  {
+    c.r = Hex_U8(str);
+    c.g = Hex_U8(str + 2);
+    c.b = Hex_U8(str + 4);
+  }
+  else              // ...RrGgBb = Rr, Gg, Bb
+  {
+    c.r = Hex_U8(str + n - 6);
+    c.g = Hex_U8(str + n - 4);
+    c.b = Hex_U8(str + n - 2);
+  }
+
+  return c;
+}
+
+Point Point_Make(S32 x, S32 y)
+{
+  Point p;
+  p.x = x;
+  p.y = y;
+  return p;
 }
 
 Colour Retro_Colour_ReadRGB(U8* p)
@@ -775,6 +925,16 @@ Size Size_Make(U32 w, U32 h)
   s.w = w;
   s.h = h;
   return s;
+}
+
+Rect Rect_Make(S32 x, S32 y, S32 w, S32 h)
+{
+  Rect r;
+  r.x = x;
+  r.y = y;
+  r.w = w;
+  r.h = h;
+  return r;
 }
 
 U8* Arena_Obtain(U32 size)
@@ -970,33 +1130,40 @@ void Retro_Scope_Pop()
 
 void Retro_Canvas_DrawPalette(S32 Y)
 {
-  int w = RCTX->settings.canvasHeight / 16;
-  int h = 8;
+  Retro_Canvas_DrawPalette2(Y, 0, RCTX->settings.palette.count - 1);
+}
 
-  int x = 0;
-  int y = 0;
-
-  for(int i=0;i < RCTX->settings.palette.count;i++)
+void Retro_Canvas_DrawPalette2(S32 Y, U8 from, U8 to)
+{
+  if (from > to)
   {
-    Rect rect;
-    rect.x = x;
-    rect.y = y;
-    rect.w = w;
-    rect.y = h;
+    U8 t = to;
+    to = from;
+    from = t;
+  }
+
+  Rect rect;
+  rect.x = 0;
+  rect.y = Y;
+  rect.w = RCTX->settings.canvasHeight / 16;
+  rect.h = 8;
+
+  for(U16 i=from, j=1;i < (to + 1);i++, j++)
+  {
 
     Retro_Canvas_DrawRectangle(i, rect);
 
-    if (i > 0 && i % 16 == 0)
+    if (j % 16 == 0)
     {
-      x = 0;
-      y += h;
+      rect.x = 0;
+      rect.y += rect.h;
     }
     else
     {
-      x += w;
+      rect.x += rect.w;
     }
   }
-  
+
 }
 
 void Retro_Canvas_DrawBox(U8 colour, Rect rect)
@@ -1018,14 +1185,66 @@ void Retro_Canvas_DrawRectangle(U8 colour, Rect rect)
   SDL_Rect dst;
   RETRO_SDL_TO_RECT(rect, dst);
 
-  RETRO_SDL_DRAW_PUSH_RGB(t, rgb);
-
+  SDL_SetRenderDrawColor(RCTX->renderer, rgb.r, rgb.g, rgb.b, 0xFF);
   SDL_RenderFillRect(RCTX->renderer, &dst);
-
-  RETRO_SDL_DRAW_POP_RGB(t);
+  SDL_SetRenderDrawColor(RCTX->renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 }
 
 char* gFmtScratch;
+
+void  Retro_Canvas_MonoPrint(S32 x, S32 y, S32 w, Font* font, U8 colour, const char* str)
+{
+  assert(font);
+  assert(str);
+
+  Colour rgb = Retro_Palette_Get(colour);
+
+  SDL_Rect s, d;
+  s.x = 0;
+  s.y = 0;
+  s.w = 0;
+  s.h = font->height;
+  d.x = x;
+  d.y = y;
+  d.w = 0;
+  d.h = s.h; 
+
+  RetroP_Bitmap* bitmapObject = RetroP_Bitmap_Get(font->bitmap);
+  assert(bitmapObject);
+
+  SDL_Texture* texture = (SDL_Texture*) bitmapObject->texture;
+
+  RETRO_SDL_TEXTURE_PUSH_RGB(t, texture, rgb);
+
+  while(true)
+  {
+    U8 c = *str++;
+
+    if (c == 0x0)
+      break;
+
+    if (c == ' ')
+    {
+      d.x += w;
+      continue;
+    }
+
+    s.x = font->x[c];
+    s.w = font->widths[c];
+
+    S32 ox = d.x;
+    S32 ix = (w - font->widths[c]);
+
+    d.x += ix / 2;
+    d.w = s.w;
+
+    SDL_RenderCopy(RCTX->renderer, texture, &s, &d);
+
+    d.x = ox + w;
+  }
+
+  RETRO_SDL_TEXTURE_POP_RGB(t, texture);
+}
 
 void Retro_Canvas_Print(S32 x, S32 y, Font* font, U8 colour, const char* str)
 {
@@ -1418,7 +1637,7 @@ void Retro_Resources_LoadFont(const char* name, Font* outFont, Colour markerColo
   for(i=0;i < width * 3;i+=3)
   {
     Colour col = Retro_Colour_ReadRGB(&imageData[i]);
-    if (Colour_Equals(col, markerColour))
+    if (Retro_Colour_Equals(col, markerColour))
     {
       int x = i / 3;
 
@@ -1431,7 +1650,7 @@ void Retro_Resources_LoadFont(const char* name, Font* outFont, Colour markerColo
         outFont->x[ch] = lx;
         outFont->widths[ch] = x - lx;
         ch++;
-        lx = x;
+        lx = x + 1;
       }
     }
   }
@@ -1447,7 +1666,7 @@ void Retro_Resources_LoadFont(const char* name, Font* outFont, Colour markerColo
     pixels[i+1] = 0xFF;
     pixels[i+2] = 0xFF;
 
-    if (Colour_Equals(col, transparentColour))
+    if (Retro_Colour_Equals(col, transparentColour))
     {
       pixels[i+3] = 0x00;
     }
@@ -1470,6 +1689,80 @@ void Retro_Resources_LoadFont(const char* name, Font* outFont, Colour markerColo
   outFont->height = height - 1;
   outFont->bitmap = bitmap->bitmapHandle;
 
+}
+
+void  Retro_Resources_LoadFontFixed(const char* name, Font* outFont, U8 w, Colour transparentColour)
+{
+  U32 width, height;
+
+  U8* imageData = NULL;
+
+#ifdef RETRO_WINDOWS
+  U32 resourceSize = 0;
+  void* resourceData = Retro_Resource_Load(name, &resourceSize);
+  lodepng_decode_memory(&imageData, &width, &height, resourceData, resourceSize, LCT_RGB, 8);
+#elif defined(RETRO_BROWSER)
+  RETRO_MAKE_BROWSER_PATH(name);
+  lodepng_decode_file(&imageData, &width, &height, RETRO_BROWSER_PATH, LCT_RGB, 8);
+#endif
+
+  assert(imageData);
+
+  SDL_Texture* texture = SDL_CreateTexture(RCTX->renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, width, height - 1);
+
+  void* pixelsVoid;
+  int pitch;
+
+  SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+  SDL_LockTexture(texture, NULL, &pixelsVoid, &pitch);
+  U8* pixels = (U8*) pixelsVoid;
+
+  U32 i, j;
+
+  U32 lx = 0xCAFEBEEF;
+  U8  ch = '!';
+  U16 nbChars = (width / w);
+
+  // Scan the first line for markers.
+  for(i=0;i < nbChars;i++)
+  {
+    outFont->x[ch] = (i * w);
+    outFont->widths[ch] = w;
+    ch++;
+  }
+
+  outFont->widths[' '] = w;
+
+  // Copy rest of image into the texture.
+  for(i=0, j=width * 3;i < width * height * 4;i+=4, j+=3)
+  {
+    Colour col = Retro_Colour_ReadRGB(&imageData[j]);
+
+    pixels[i+0] = 0xFF;
+    pixels[i+1] = 0xFF;
+    pixels[i+2] = 0xFF;
+
+    if (Retro_Colour_Equals(col, transparentColour))
+    {
+      pixels[i+3] = 0x00;
+    }
+    else
+    {
+      pixels[i+3] = 0xFF;
+    }
+  }
+
+  SDL_UnlockTexture(texture);
+
+  RetroP_Bitmap* bitmap = RetroP_Bitmap_GetFree();
+
+  bitmap->texture = texture;
+  bitmap->w = width;
+  bitmap->h = height;
+  bitmap->imageData = imageData;
+
+  outFont->height = height - 1;
+  outFont->bitmap = bitmap->bitmapHandle;
 }
 
 int Retro_Input_TextInput(char* str, U32 capacity)
@@ -2041,8 +2334,6 @@ int main(int argc, char **argv)
   RCTX->settings.palette.transparent = 16;
 #endif
 
-  Init();
-
   for (U8 i=0;i < RETRO_CANVAS_COUNT;i++)
   {
     RCTX->canvasTextures[i] = SDL_CreateTexture(RCTX->renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_TARGET, RETRO_CANVAS_DEFAULT_WIDTH, RETRO_CANVAS_DEFAULT_HEIGHT);
@@ -2054,6 +2345,8 @@ int main(int argc, char **argv)
   }
 
   Retro_Canvas_Use(0);
+
+  Init();
 
   RCTX->quit = false;
 

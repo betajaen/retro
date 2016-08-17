@@ -28,3 +28,17 @@ solution "Game"
           excludes        { "retro.c", "ref/*.c", "ref/*.h" }
 
       --------------------------------------------------------------------------
+
+      project "Editor"
+          kind            "ConsoleApp"
+          language        "C++"
+          flags           { "FatalWarnings", "NoExceptions", "NoRTTI" }
+          defines         { }
+          links           { "SDL2", "SDL2main"}
+          includedirs     { "ref/SDL2/include", "ref/" }
+          libdirs         { "ref/SDL2/lib/x86/" }
+          
+          files           { "retro.c", "retro.h", "editor/editor.c", "editor/*.c", "editor/*.h", "ref/*.c", "ref/*.h", "editor/editor_resources.rc", "editor/assets/*.png", "editor/assets/*.wav", "editor/assets/*.mod" }
+          excludes        { "retro.c", "ref/*.c", "ref/*.h" }
+
+      --------------------------------------------------------------------------

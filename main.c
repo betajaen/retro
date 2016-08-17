@@ -1,4 +1,5 @@
 #define RETRO_WINDOW_CAPTION "Retro Game"
+#define RETRO_CANVAS_COUNT 1
 
 #include "retro.c"
 
