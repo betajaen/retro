@@ -40,8 +40,8 @@ static void micromod_sdl_downsample(micromod_sdl_context* ctx, short *input, sho
     out_r = ctx->filt_r + ( input[ in_idx++ ] >> 1 );
     ctx->filt_l = input[ in_idx++ ] >> 2;
     ctx->filt_r = input[ in_idx++ ] >> 2;
-    output[ out_idx++ ] = out_l + ctx->filt_l;
-    output[ out_idx++ ] = out_r + ctx->filt_r;
+    output[ out_idx++ ] = (short) ( out_l + ctx->filt_l );
+    output[ out_idx++ ] = (short) ( out_r + ctx->filt_r );
   }
 }
 
@@ -67,8 +67,8 @@ static void micromod_sdl_downsample_float(micromod_sdl_context* ctx, short *inpu
     out_r = ctx->filt_r + ( input[ in_idx++ ] >> 1 );
     ctx->filt_l = input[ in_idx++ ] >> 2;
     ctx->filt_r = input[ in_idx++ ] >> 2;
-    short l = out_l + ctx->filt_l;
-    short r = out_r + ctx->filt_r;
+    short l = (short) ( out_l + ctx->filt_l );
+    short r = (short) ( out_r + ctx->filt_r );
     
     output[ out_idx++ ] = micromod_sdl_s16_to_float(l);
     output[ out_idx++ ] = micromod_sdl_s16_to_float(r);

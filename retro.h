@@ -263,7 +263,7 @@ typedef struct
   (A.r == B.r && A.g == B.g && A.b == B.b)
 
 #define RETRO_UNUSED(X) \
- (void)X
+  ((void) X)
 
 #define RETRO_ARRAY_COUNT(X) \
   (sizeof(X) / sizeof((X)[0]))

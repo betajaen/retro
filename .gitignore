@@ -10,5 +10,6 @@
 ref/SDL2/
 bin/
 obj/
+_build/
 
 genie.exe

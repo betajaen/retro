@@ -77,7 +77,7 @@ typedef struct
 
 typedef struct
 {
-  S32 length;
+  U32 length;
   U8* buffer;
   SDL_AudioSpec spec;
   SoundHandle soundHandle;
@@ -86,7 +86,7 @@ typedef struct
 typedef struct
 {
   RetroP_Sound* sound;
-  S32    p;
+  U32    p;
   U8     volume;
 } Retro_SoundObject;
 
@@ -1569,9 +1569,9 @@ void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
     if (soundObj->sound == NULL)
       continue;
 
-    S32 soundLength = soundObj->sound->length;
+    U32 soundLength = soundObj->sound->length;
     
-    S32 mixLength = (streamLength > soundLength ? soundLength : streamLength);
+    U32 mixLength = ( (U32) streamLength > soundLength ? soundLength : streamLength);
     
 
     if (soundObj->p + mixLength >= soundLength)
@@ -1997,17 +1997,6 @@ bool  Retro_Timer_Paused(Timer* timer)
   return timer->flags >= TF_Paused;
 }
 
-void Restart()
-{
-  RETROP_ARENA.current = RETROP_ARENA.begin;
-  
-  RCTX->scopeStackIndex = 0;
-  RCTX->scopeStack[0].p = 0;
-  RCTX->scopeStack[0].name = 'INIT';
-
-  Start();
-}
-
 void Canvas_Present()
 {
   switch(RCTX->framePresentation)
@@ -2113,6 +2102,22 @@ void Canvas_Present()
   }
 }
 
+#ifdef RETRO_IS_LIBRARY
+
+void Lib_Init()
+{
+}
+
+void Lib_Start()
+{
+}
+
+void Lib_Step()
+{
+}
+
+#endif
+
 void Frame()
 {
 
@@ -2198,7 +2203,12 @@ void Frame()
 
   Retro_Canvas_Use(0);
   
-  Step();
+  #ifdef RETRO_IS_LIBRARY
+    Lib_Step();
+  #else
+    Step();
+  #endif
+
   SDL_SetRenderTarget(RCTX->renderer, NULL);
 
   Canvas_Present();
@@ -2210,6 +2220,20 @@ void Frame()
   Retro_Timer_Start(&RCTX->deltaTimer);
 }
 
+void Restart()
+{
+  RETROP_ARENA.current = RETROP_ARENA.begin;
+
+  RCTX->scopeStackIndex = 0;
+  RCTX->scopeStack[0].p = 0;
+  RCTX->scopeStack[0].name = 'INIT';
+
+#ifdef RETRO_IS_LIBRARY
+  Lib_Start();
+#else
+  Start();
+#endif
+}
 
 #ifdef RETRO_WINDOWS
 int main(int argc, char *argv[])
@@ -2346,7 +2370,11 @@ int main(int argc, char **argv)
 
   Retro_Canvas_Use(0);
 
-  Init();
+  #ifdef RETRO_IS_LIBRARY
+    Lib_Init();
+  #else
+    Init();
+  #endif
 
   RCTX->quit = false;
 
