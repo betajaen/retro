@@ -7,6 +7,14 @@
 #define RETRO_MAX_CONTEXT 2
 #endif
 
+#ifndef RETRO_DEFAULT_MAX_INPUT_BINDINGS
+#define RETRO_DEFAULT_MAX_INPUT_BINDINGS 4
+#endif
+
+#ifndef RETRO_DEFAULT_MAX_ANIMATED_SPRITE_FRAMES
+#define RETRO_DEFAULT_MAX_ANIMATED_SPRITE_FRAMES 8
+#endif
+
 #ifdef RETRO_WINDOWS
 #   include "windows.h"
 #endif
@@ -38,8 +46,8 @@ typedef struct
 typedef struct
 {
   U32 action;
-  int keys[RETRO_MAX_INPUT_BINDINGS];
-  int axis[RETRO_MAX_INPUT_BINDINGS];
+  int keys[RETRO_DEFAULT_MAX_INPUT_BINDINGS];
+  int axis[RETRO_DEFAULT_MAX_INPUT_BINDINGS];
   S16 state, lastState;
 } RetroP_InputActionBinding;
 
@@ -93,7 +101,7 @@ typedef struct
   U8              w, h;
   U16             frameLength;
   AnimationHandle animationHandle;
-  Rect            frames[RETRO_MAX_ANIMATED_SPRITE_FRAMES];
+  Rect            frames[RETRO_DEFAULT_MAX_ANIMATED_SPRITE_FRAMES];
 } RetroP_Animation;
 
 typedef union
@@ -128,7 +136,7 @@ typedef struct
   RetroP_Arena                 arena;
 
   // User Settings
-  Retro_Initialiser            settings;
+  Retro_Settings            settings;
 
   // User Scope
   RetroP_ScopeStack            scopeStack[256];
@@ -168,11 +176,8 @@ typedef struct
 
   // Audio
   RetroP_SoundDevice           soundDevice;
-  RetroP_SoundObject*           soundObject;
+  RetroP_SoundObject*          soundObject;
   micromod_sdl_context*        musicContext;
-#ifdef RETRO_BROWSER
-#endif
-
 
   // Platform specific
 #ifdef RETRO_BROWSER
@@ -282,7 +287,7 @@ void  Retro_Resources_LoadPalette(const char* name)
 
 RetroP_Bitmap* RetroP_Bitmap_GetFree()
 {
-  for (U32 i=0;i < RETRO_MAX_ANIMATIONS;i++)
+  for (U32 i=0;i < RETRO_DEFAULT_MAX_ANIMATIONS;i++)
   {
     if (RCTX->bitmaps[i].bitmapHandle == 0xFFFF)
     {
@@ -382,7 +387,7 @@ BitmapHandle Retro_Resources_LoadBitmap(const char* name,  U8 transparentIndex)
 
 RetroP_Sprite* Retro_SpriteHandle_GetFree()
 {
-  for (U32 i=0;i < RETRO_MAX_SPRITES;i++)
+  for (U32 i=0;i < RETRO_DEFAULT_MAX_SPRITES;i++)
   {
     if (RCTX->sprites[i].spriteHandle == 0xFFFF)
     {
@@ -416,7 +421,7 @@ SpriteHandle Retro_Sprites_LoadSprite(BitmapHandle bitmap, U32 x, U32 y, U32 w, 
 
 RetroP_Animation* RetroP_AnimationHandle_GetFree()
 {
-  for (U32 i=0;i < RETRO_MAX_ANIMATIONS;i++)
+  for (U32 i=0;i < RETRO_DEFAULT_MAX_ANIMATIONS;i++)
   {
     if (RCTX->animations[i].animationHandle == 0xFFFF)
     {
@@ -435,8 +440,8 @@ RetroP_Animation* Retro_AnimationHandle_Get(AnimationHandle handle)
 
 AnimationHandle Retro_Animation_Load(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight, S32 frameOffsetX, S32 frameOffsetY)
 {
-  assert(numFrames < RETRO_MAX_ANIMATED_SPRITE_FRAMES);
-
+  assert(numFrames < RETRO_DEFAULT_MAX_ANIMATED_SPRITE_FRAMES);
+  
   RetroP_Animation* animation = RetroP_AnimationHandle_GetFree();
 
   animation->bitmap = bitmap;
@@ -473,7 +478,7 @@ AnimationHandle  Retro_Sprites_LoadAnimationV(BitmapHandle bitmap, U8 numFrames,
 
 void Retro_Canvas_Use(U8 id)
 {
-  assert(id < RETRO_CANVAS_COUNT);
+  assert(id < RCTX->settings.canvasCount);
   RCTX->canvasTexture = RCTX->canvas[id].texture;
   SDL_SetRenderTarget(RCTX->renderer, RCTX->canvasTexture);
 }
@@ -485,7 +490,7 @@ void Retro_Canvas_Clear()
 
 void Retro_Canvas_Flags(U8 id, U8 flags, U8 colour)
 {
-  assert(id < RETRO_CANVAS_COUNT);
+  assert(id < RCTX->settings.canvasCount);
 
   RetroP_Canvas* canvas = &RCTX->canvas[id];
 
@@ -976,7 +981,7 @@ void RetroP_Arena_RewindPtr(U8* mem)
 
 void RetroP_Arena_RewindU32(U32 offset)
 {
-  assert(offset < RETRO_ARENA_SIZE);
+  assert(offset < RCTX->settings.arenaSize);
   RCTX->arena.current = RCTX->arena.begin + offset;
 }
 
@@ -988,7 +993,7 @@ U32 RetroP_Arena_Current()
 int  RetroP_Arena_PctSize()
 {
   U32 used = (RCTX->arena.current - RCTX->arena.begin);
-  float pct = ((float) used / (float) RETRO_ARENA_SIZE);
+  float pct = ((float) used / (float) RETRO_DEFAULT_ARENA_SIZE);
   return (int) (pct * 100.0f);
 }
 
@@ -1092,7 +1097,7 @@ void Retro_Arena_LoadFromMemory(U8* mem, bool loadMusic)
   assert(l.header[1] == 'E');
   assert(l.header[2] == 'T');
   assert(l.header[3] == 'R');
-  assert(l.size < RETRO_ARENA_SIZE);
+  assert(l.size < RCTX->settings.arenaSize);
  
   RCTX->scopeStackIndex = l.scopeStackIndex;
   
@@ -1135,7 +1140,7 @@ int Retro_Scope_Name()
 U8* Retro_Scope_Obtain(U32 size)
 {
   RetroP_ScopeStack* scope = &RCTX->scopeStack[RCTX->scopeStackIndex];
-  assert(scope->p + size < RETRO_ARENA_SIZE); // Ensure can fit.
+  assert(scope->p + size < RCTX->settings.arenaSize); // Ensure can fit.
   return RetroP_Arena_Obtain(size);
 }
 
@@ -1386,7 +1391,7 @@ void  Retro_Debug(Font* font)
   f.q = Retro_Scope_Name();
   
   U32 soundObjectCount = 0;
-  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  for(U32 i=0;i < RETRO_DEFAULT_MAX_SOUND_OBJECTS;i++)
   {
     RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
 
@@ -1406,7 +1411,7 @@ void  Retro_Debug(Font* font)
 
 RetroP_Sound* RetroP_Sound_GetFree()
 {
-  for (U32 i=0;i < RETRO_MAX_SOUNDS;i++)
+  for (U32 i=0;i < RETRO_DEFAULT_MAX_SOUNDS;i++)
   {
     if (RCTX->sounds[i].soundHandle == 0xFFFF)
     {
@@ -1467,7 +1472,7 @@ void  Retro_Audio_PlaySound(SoundHandle soundHandle, U8 volume)
 {
   RetroP_Sound* sound = RetroP_Sound_Get(soundHandle);
 
-  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  for(U32 i=0;i < RETRO_DEFAULT_MAX_SOUND_OBJECTS;i++)
   {
     RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
     if (soundObj->sound != NULL)
@@ -1483,7 +1488,7 @@ void  Retro_Audio_PlaySound(SoundHandle soundHandle, U8 volume)
 
 void  Retro_Audio_ClearSounds()
 {
-  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  for(U32 i=0;i < RETRO_DEFAULT_MAX_SOUND_OBJECTS;i++)
   {
     RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
 
@@ -1586,7 +1591,7 @@ void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
     }
   }
 
-  for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
+  for(U32 i=0;i < RETRO_DEFAULT_MAX_SOUND_OBJECTS;i++)
   {
     RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
 
@@ -1827,7 +1832,7 @@ int Retro_Input_TextInput(char* str, U32 capacity)
 
 RetroP_InputActionBinding* Retro_Input_GetAction(int action)
 {
-  for(int i=0;i < RETRO_MAX_INPUT_ACTIONS;++i)
+  for(int i=0;i < RETRO_DEFAULT_MAX_INPUT_ACTIONS;++i)
   {
     RetroP_InputActionBinding* binding = &RCTX->inputActions[i];
     if (binding->action == action)
@@ -1838,7 +1843,7 @@ RetroP_InputActionBinding* Retro_Input_GetAction(int action)
 
 RetroP_InputActionBinding* Retro_Input_MakeAction(int action)
 {
-  for(int i=0;i < RETRO_MAX_INPUT_ACTIONS;++i)
+  for(int i=0;i < RETRO_DEFAULT_MAX_INPUT_ACTIONS;++i)
   {
     RetroP_InputActionBinding* binding = &RCTX->inputActions[i];
     if (binding->action == 0xDEADBEEF)
@@ -1861,7 +1866,7 @@ void  Retro_Input_BindKey(int key, int action)
     binding = Retro_Input_MakeAction(action);
   }
 
-  for (U32 i=0;i < RETRO_MAX_INPUT_BINDINGS;i++)
+  for (U32 i=0;i < RETRO_DEFAULT_MAX_INPUT_BINDINGS;i++)
   {
     if (binding->keys[i] == 0)
     {
@@ -1882,7 +1887,7 @@ void  Retro_Input_BindAxis(int axis, int action)
     binding = Retro_Input_MakeAction(action);
   }
 
-  for (U32 i=0;i < RETRO_MAX_INPUT_BINDINGS;i++)
+  for (U32 i=0;i < RETRO_DEFAULT_MAX_INPUT_BINDINGS;i++)
   {
     if (binding->axis[i] == 0)
     {
@@ -2027,7 +2032,7 @@ void Canvas_Present()
   {
     case FP_Normal:
     {
-      for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+      for (int i=0;i < RETRO_DEFAULT_CANVAS_COUNT;i++)
       {
         if (RCTX->canvas[i].flags & CNF_Render)
         {
@@ -2040,24 +2045,24 @@ void Canvas_Present()
     {
       U32 accuracy = 2;
 
-      for (U32 u=0;u < RETRO_WINDOW_DEFAULT_HEIGHT;u+=accuracy)
+      for (U32 u=0;u < RETRO_DEFAULT_WINDOW_HEIGHT;u+=accuracy)
       {
         SDL_Rect src;
         SDL_Rect dst;
         src.x = 0;
         src.y = u;
-        src.w = RETRO_CANVAS_DEFAULT_WIDTH;
+        src.w = RETRO_DEFAULT_CANVAS_WIDTH;
         src.h = accuracy;
 
         dst = src;
 
-        float x0 = (float) u / (float) RETRO_WINDOW_DEFAULT_HEIGHT;
+        float x0 = (float) u / (float) RETRO_DEFAULT_WINDOW_HEIGHT;
         dst.x = (sin((RCTX->frameCount % 1000) * RCTX->frameAlpha + x0 * 3.14f) * RCTX->frameBeta);
         dst.y = u * 2;
-        dst.w = RETRO_WINDOW_DEFAULT_WIDTH;
+        dst.w = RETRO_DEFAULT_WINDOW_WIDTH;
         dst.h = accuracy * 2;
 
-        for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+        for (int i=0;i < RETRO_DEFAULT_CANVAS_COUNT;i++)
         {
           if (RCTX->canvas[i].flags & CNF_Render)
           {
@@ -2071,24 +2076,24 @@ void Canvas_Present()
     {
       U32 accuracy = 2;
 
-      for (U32 u=0;u < RETRO_WINDOW_DEFAULT_HEIGHT;u+=accuracy)
+      for (U32 u=0;u < RETRO_DEFAULT_WINDOW_HEIGHT;u+=accuracy)
       {
         SDL_Rect src;
         SDL_Rect dst;
         src.x = u;
         src.y = 0;
         src.w = accuracy;
-        src.h = RETRO_CANVAS_DEFAULT_HEIGHT;
+        src.h = RETRO_DEFAULT_CANVAS_HEIGHT;
 
         dst = src;
 
-        float y0 = (float) u / (float) RETRO_WINDOW_DEFAULT_HEIGHT;
+        float y0 = (float) u / (float) RETRO_DEFAULT_WINDOW_HEIGHT;
         dst.x = u * 2;
         dst.y = (sin((RCTX->frameCount % 1000) * RCTX->frameAlpha + y0 * 3.14f) * RCTX->frameBeta);
         dst.w = accuracy * 2;
-        dst.h = RETRO_WINDOW_DEFAULT_HEIGHT;
+        dst.h = RETRO_DEFAULT_WINDOW_HEIGHT;
 
-        for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+        for (int i=0;i < RETRO_DEFAULT_CANVAS_COUNT;i++)
         {
           if (RCTX->canvas[i].flags & CNF_Render)
           {
@@ -2103,18 +2108,18 @@ void Canvas_Present()
 
       SDL_Rect src;
       SDL_Rect dst;
-      src.w = (float) RETRO_CANVAS_DEFAULT_WIDTH * RCTX->frameAlpha;
-      src.h = (float) RETRO_CANVAS_DEFAULT_HEIGHT * RCTX->frameBeta;
+      src.w = (float) RETRO_DEFAULT_CANVAS_WIDTH * RCTX->frameAlpha;
+      src.h = (float) RETRO_DEFAULT_CANVAS_HEIGHT * RCTX->frameBeta;
       src.x = 0; //src.w / 2;
       src.y = 0; //src.h / 2;
 
       dst = src;
-      dst.x = RETRO_WINDOW_DEFAULT_WIDTH / 2 - (src.w);
-      dst.y = RETRO_WINDOW_DEFAULT_HEIGHT / 2 - (src.h);
+      dst.x = RETRO_DEFAULT_WINDOW_WIDTH / 2 - (src.w);
+      dst.y = RETRO_DEFAULT_WINDOW_HEIGHT / 2 - (src.h);
       dst.w *= 2;
       dst.h *= 2;
 
-      for (int i=0;i < RETRO_CANVAS_COUNT;i++)
+      for (int i=0;i < RETRO_DEFAULT_CANVAS_COUNT;i++)
       {
         if (RCTX->canvas[i].flags & CNF_Render)
         {
@@ -2125,25 +2130,6 @@ void Canvas_Present()
     break;
   }
 }
-
-#ifdef RETRO_IS_LIBRARY
-
-void Lib_Init()
-{
-  RCTX->InitFunction();
-}
-
-void Lib_Start()
-{
-  RCTX->StartFunction();
-}
-
-void Lib_Step()
-{
-  RCTX->StepFunction();
-}
-
-#endif
 
 void Frame()
 {
@@ -2194,7 +2180,7 @@ void Frame()
 
   const Uint8 *state = SDL_GetKeyboardState(NULL);
 
-  for (U32 i=0;i < RETRO_MAX_INPUT_ACTIONS;i++)
+  for (U32 i=0;i < RETRO_DEFAULT_MAX_INPUT_ACTIONS;i++)
   {
     RetroP_InputActionBinding* binding = &RCTX->inputActions[i];
     if (binding->action == 0xDEADBEEF)
@@ -2203,7 +2189,7 @@ void Frame()
     binding->lastState = binding->state;
     binding->state = 0;
 
-    for (U32 j=0; j < RETRO_MAX_INPUT_BINDINGS;j++)
+    for (U32 j=0; j < RETRO_DEFAULT_MAX_INPUT_BINDINGS;j++)
     {
       int key = binding->keys[j];
 
@@ -2216,7 +2202,7 @@ void Frame()
     // @TODO Axis
   }
   
-  for (U8 i=0;i < RETRO_CANVAS_COUNT;i++)
+  for (U8 i=0;i < RETRO_DEFAULT_CANVAS_COUNT;i++)
   {
     if (RCTX->canvas[i].flags & CNF_Clear)
     {
@@ -2230,11 +2216,7 @@ void Frame()
 
   Retro_Canvas_Use(0);
   
-  #ifdef RETRO_IS_LIBRARY
-    Lib_Step();
-  #else
-    Step();
-  #endif
+  RCTX->stepFunction();
 
   SDL_SetRenderTarget(RCTX->renderer, NULL);
 
@@ -2255,11 +2237,7 @@ void Restart()
   RCTX->scopeStack[0].p = 0;
   RCTX->scopeStack[0].name = 'INIT';
 
-#ifdef RETRO_IS_LIBRARY
-  Lib_Start();
-#else
-  Start();
-#endif
+  RCTX->startFunction();
 }
 
 void InitialiseRetro(const char* caption, U32 width, U32 height)
@@ -2285,6 +2263,9 @@ void InitialiseRetro(const char* caption, U32 width, U32 height)
     SDL_WINDOW_SHOWN
   );
 
+  RETROP_WINDOW_WIDTH = width;
+  RETROP_WINDOW_HEIGHT = height;
+
   gFmtScratch = malloc(1024);
 
 }
@@ -2297,9 +2278,9 @@ void RetroLoop()
   {
     Frame();
     float frameTicks = Retro_Timer_Ticks(&RCTX->capTimer);
-    if (frameTicks < (1000.0f / RETRO_FRAME_RATE))
+    if (frameTicks < (1000.0f / RETRO_DEFAULT_FRAME_RATE))
     {
-      SDL_Delay((1000.0f / RETRO_FRAME_RATE) - frameTicks);
+      SDL_Delay((1000.0f / RETRO_DEFAULT_FRAME_RATE) - frameTicks);
     }
   }
 #endif
@@ -2315,7 +2296,7 @@ void ShutdownRetro()
   SDL_Quit();
 }
 
-static RetroP_Context* AllocateContextAndArenaBytes(Retro_Initialiser* settings)
+static RetroP_Context* AllocateContextAndArenaBytes(Retro_Settings* settings)
 {
   // This is essentially one massive allocation, containing the Context and Resources and the Arena at the end.
   U32 nbBytes = 0;
@@ -2347,11 +2328,11 @@ static RetroP_Context* AllocateContextAndArenaBytes(Retro_Initialiser* settings)
   return context;
 }
 
-static void InitContext(Retro_Initialiser* settings, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
+static void InitContext(Retro_Settings* settings, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
 {
   // Allocate memory, and arena. 
   RCTX = AllocateContextAndArenaBytes(settings);
-  memcpy(&RCTX->settings, settings, sizeof(Retro_Initialiser));
+  memcpy(&RCTX->settings, settings, sizeof(Retro_Settings));
 
   
   // Copy in context functions
@@ -2390,6 +2371,7 @@ static void InitContext(Retro_Initialiser* settings, void(*InitFunction)(), void
     RCTX->inputActions[i].action = 0xDEADBEEF;
   }
 
+
   // Sound
   RCTX->soundObject  = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxSoundObjects, RetroP_SoundObject);
 
@@ -2420,6 +2402,8 @@ static void InitContext(Retro_Initialiser* settings, void(*InitFunction)(), void
   RCTX->musicFileData = NULL;
 #endif
 
+
+  // Renderer and Default Palette
   RCTX->renderer = SDL_CreateRenderer(RETROP_WINDOW, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
   RCTX->framePresentation = FP_Normal;
   RCTX->frameAlpha = 0.78f;
@@ -2451,6 +2435,7 @@ static void InitContext(Retro_Initialiser* settings, void(*InitFunction)(), void
     RCTX->palette.transparent = 16;
   }
 
+  // Canvas and Canvas texture setup
   for (U8 i=0;i < settings->canvasCount;i++)
   {
     RCTX->canvas[i].texture = SDL_CreateTexture(
@@ -2469,11 +2454,7 @@ static void InitContext(Retro_Initialiser* settings, void(*InitFunction)(), void
 
   Retro_Canvas_Use(0);
 
-#ifdef RETRO_IS_LIBRARY
-  Lib_Init();
-#else
-  Init();
-#endif
+  RCTX->initFunction();
 
   RCTX->quit = false;
 
@@ -2493,7 +2474,7 @@ void ReleaseContext(RetroP_Context* context)
   free(RCTX);
 }
 
-int StartRetro(Retro_Initialiser* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
+int StartRetro(Retro_Settings* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
 {
   assert(initialiser);
   InitialiseRetro(initialiser->caption, initialiser->windowWidth, initialiser->windowHeight);

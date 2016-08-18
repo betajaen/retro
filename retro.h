@@ -15,83 +15,75 @@
 #define RETRO_MEGABYTES(N) \
   (RETRO_KILOBYTES(N) * 1024)
 
-#ifndef RETRO_WINDOW_CAPTION
-#define RETRO_WINDOW_CAPTION "Retro"
+#ifndef RETRO_DEFAULT_WINDOW_CAPTION
+#define RETRO_DEFAULT_WINDOW_CAPTION "Retro"
 #endif
 
-#ifndef RETRO_WINDOW_DEFAULT_WIDTH
-#define RETRO_WINDOW_DEFAULT_WIDTH 640
+#ifndef RETRO_DEFAULT_WINDOW_WIDTH
+#define RETRO_DEFAULT_WINDOW_WIDTH 640
 #endif
 
-#ifndef RETRO_WINDOW_DEFAULT_HEIGHT
-#define RETRO_WINDOW_DEFAULT_HEIGHT 480
+#ifndef RETRO_DEFAULT_WINDOW_HEIGHT
+#define RETRO_DEFAULT_WINDOW_HEIGHT 480
 #endif
 
-#ifndef RETRO_CANVAS_DEFAULT_WIDTH
-#define RETRO_CANVAS_DEFAULT_WIDTH 320
+#ifndef RETRO_DEFAULT_CANVAS_WIDTH
+#define RETRO_DEFAULT_CANVAS_WIDTH 320
 #endif
 
-#ifndef RETRO_CANVAS_DEFAULT_HEIGHT
-#define RETRO_CANVAS_DEFAULT_HEIGHT 240
+#ifndef RETRO_DEFAULT_CANVAS_HEIGHT
+#define RETRO_DEFAULT_CANVAS_HEIGHT 240
 #endif
 
-#ifndef RETRO_SOUND_DEFAULT_VOLUME
-#define RETRO_SOUND_DEFAULT_VOLUME 1.0
+#ifndef RETRO_DEFAULT_SOUND_DEFAULT_VOLUME
+#define RETRO_DEFAULT_SOUND_DEFAULT_VOLUME 1.0
 #endif
 
-#ifndef RETRO_FRAME_RATE
-#define RETRO_FRAME_RATE 30
+#ifndef RETRO_DEFAULT_FRAME_RATE
+#define RETRO_DEFAULT_FRAME_RATE 30
 #endif
 
-#ifndef RETRO_ARENA_SIZE
-#define RETRO_ARENA_SIZE RETRO_KILOBYTES(1)
+#ifndef RETRO_DEFAULT_ARENA_SIZE
+#define RETRO_DEFAULT_ARENA_SIZE RETRO_KILOBYTES(1)
 #endif
 
-#ifndef RETRO_MAX_INPUT_ACTIONS
-#define RETRO_MAX_INPUT_ACTIONS 32
+#ifndef RETRO_DEFAULT_MAX_INPUT_ACTIONS
+#define RETRO_DEFAULT_MAX_INPUT_ACTIONS 32
 #endif
 
-#ifndef RETRO_MAX_INPUT_BINDINGS
-#define RETRO_MAX_INPUT_BINDINGS 4
+#ifndef RETRO_DEFAULT_MAX_BITMAPS
+#define RETRO_DEFAULT_MAX_BITMAPS 16
 #endif
 
-#ifndef RETRO_MAX_ANIMATED_SPRITE_FRAMES
-#define RETRO_MAX_ANIMATED_SPRITE_FRAMES 8
+#ifndef RETRO_DEFAULT_MAX_SOUNDS
+#define RETRO_DEFAULT_MAX_SOUNDS 64
+#endif
+#ifndef RETRO_DEFAULT_MAX_ANIMATIONS
+#define RETRO_DEFAULT_MAX_ANIMATIONS 256
 #endif
 
-#ifndef RETRO_MAX_BITMAPS
-#define RETRO_MAX_BITMAPS 16
+#ifndef RETRO_DEFAULT_MAX_SPRITES
+#define RETRO_DEFAULT_MAX_SPRITES 256
 #endif
 
-#ifndef RETRO_MAX_SOUNDS
-#define RETRO_MAX_SOUNDS 64
-#endif
-#ifndef RETRO_MAX_ANIMATIONS
-#define RETRO_MAX_ANIMATIONS 256
+#ifndef RETRO_DEFAULT_CANVAS_COUNT
+#define RETRO_DEFAULT_CANVAS_COUNT 2
 #endif
 
-#ifndef RETRO_MAX_SPRITES
-#define RETRO_MAX_SPRITES 256
+#ifndef RETRO_DEFAULT_MAX_SOUND_OBJECTS
+#define RETRO_DEFAULT_MAX_SOUND_OBJECTS 16
 #endif
 
-#ifndef RETRO_CANVAS_COUNT
-#define RETRO_CANVAS_COUNT 2
+#ifndef RETRO_DEFAULT_AUDIO_FREQUENCY
+#define RETRO_DEFAULT_AUDIO_FREQUENCY 48000
 #endif
 
-#ifndef RETRO_MAX_SOUND_OBJECTS
-#define RETRO_MAX_SOUND_OBJECTS 16
+#ifndef RETRO_DEFAULT_AUDIO_CHANNELS
+#define RETRO_DEFAULT_AUDIO_CHANNELS 2
 #endif
 
-#ifndef RETRO_AUDIO_FREQUENCY
-#define RETRO_AUDIO_FREQUENCY 48000
-#endif
-
-#ifndef RETRO_AUDIO_CHANNELS
-#define RETRO_AUDIO_CHANNELS 2
-#endif
-
-#ifndef RETRO_AUDIO_SAMPLES
-#define RETRO_AUDIO_SAMPLES 16384
+#ifndef RETRO_DEFAULT_AUDIO_SAMPLES
+#define RETRO_DEFAULT_AUDIO_SAMPLES 16384
 #endif 
 
 #ifndef RETRO_NAMESPACES
@@ -306,8 +298,6 @@ typedef struct
   U32         frameRate;
   U32         arenaSize;
   U16         maxInputActions;
-  U16         maxInputBindings;
-  U16         maxAnimatedSpriteFrames;
   U16         maxBitmaps;
   U16         maxSounds;
   U16         maxAnimations;
@@ -317,37 +307,36 @@ typedef struct
   U16         audioFrequency;
   U8          audioChannels;
   U32         audioSamples;
-} Retro_Initialiser;
+} Retro_Settings;
 
-const Retro_Initialiser Retro_Default_Initialiser = {
-  .caption                 = RETRO_WINDOW_CAPTION,
-  .windowWidth             = RETRO_WINDOW_DEFAULT_WIDTH,
-  .windowHeight            = RETRO_WINDOW_DEFAULT_HEIGHT,
+const Retro_Settings Retro_Default_Settings = {
+  .caption                 = RETRO_DEFAULT_WINDOW_CAPTION,
+  .windowWidth             = RETRO_DEFAULT_WINDOW_WIDTH,
+  .windowHeight            = RETRO_DEFAULT_WINDOW_HEIGHT,
   #ifdef RETRO_DEFAULT_PALETTE
   .defaultPalette          = RETRO_DEFAULT_PALETTE,
   #else
   .defaultPalette          = 0,
   #endif
-  .canvasWidth             = RETRO_CANVAS_DEFAULT_WIDTH,
-  .canvasHeight            = RETRO_CANVAS_DEFAULT_HEIGHT,
-  .soundVolume             = RETRO_SOUND_DEFAULT_VOLUME,
-  .frameRate               = RETRO_FRAME_RATE,
-  .arenaSize               = RETRO_ARENA_SIZE,
-  .maxInputActions         = RETRO_MAX_INPUT_ACTIONS,
-  .maxInputBindings        = RETRO_MAX_INPUT_BINDINGS,
-  .maxAnimatedSpriteFrames = RETRO_MAX_ANIMATED_SPRITE_FRAMES,
-  .maxBitmaps              = RETRO_MAX_BITMAPS,
-  .maxSounds               = RETRO_MAX_SOUNDS,
-  .maxAnimations           = RETRO_MAX_ANIMATIONS,
-  .maxSprites              = RETRO_MAX_SPRITES,
-  .canvasCount             = RETRO_CANVAS_COUNT,
-  .maxSoundObjects         = RETRO_MAX_SOUND_OBJECTS,
-  .audioFrequency          = RETRO_AUDIO_FREQUENCY,
-  .audioChannels           = RETRO_AUDIO_CHANNELS,
-  .audioSamples            = RETRO_AUDIO_SAMPLES
+  .canvasWidth             = RETRO_DEFAULT_CANVAS_WIDTH,
+  .canvasHeight            = RETRO_DEFAULT_CANVAS_HEIGHT,
+  .soundVolume             = RETRO_DEFAULT_SOUND_DEFAULT_VOLUME,
+  .frameRate               = RETRO_DEFAULT_FRAME_RATE,
+  .arenaSize               = RETRO_DEFAULT_ARENA_SIZE,
+  .maxInputActions         = RETRO_DEFAULT_MAX_INPUT_ACTIONS,
+  .maxBitmaps              = RETRO_DEFAULT_MAX_BITMAPS,
+  .maxSounds               = RETRO_DEFAULT_MAX_SOUNDS,
+  .maxAnimations           = RETRO_DEFAULT_MAX_ANIMATIONS,
+  .maxSprites              = RETRO_DEFAULT_MAX_SPRITES,
+  .canvasCount             = RETRO_DEFAULT_CANVAS_COUNT,
+  .maxSoundObjects         = RETRO_DEFAULT_MAX_SOUND_OBJECTS,
+  .audioFrequency          = RETRO_DEFAULT_AUDIO_FREQUENCY,
+  .audioChannels           = RETRO_DEFAULT_AUDIO_CHANNELS,
+  .audioSamples            = RETRO_DEFAULT_AUDIO_SAMPLES
 };
 
-RETRO_API int  StartRetro(Retro_Initialiser* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)());
+RETRO_API int  StartRetro(Retro_Settings* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)());
+
 RETRO_API void ShutdownRetro();
 
 #if !(defined(RETRO_IS_LIBRARY) || defined(RETRO_LIBRARY))
@@ -359,8 +348,8 @@ void  Step();
 #ifndef RETRO_NO_MAIN
 int main(int argc, char *argv[])
 {
-  Retro_Initialiser initialiser = Retro_Default_Initialiser;
-  StartRetro(&initialiser, Init, Start, Step);
+  Retro_Settings settings = Retro_Default_Settings;
+  StartRetro(&settings, Init, Start, Step);
   ShutdownRetro();
   return 0;
 }
@@ -393,7 +382,7 @@ const struct RETRO_Arena
 }
 RETRO_ARENA_NAMESPACE_NAME
 = {
-  .size          = RETRO_ARENA_SIZE,
+  .size          = RETRO_DEFAULT_ARENA_SIZE,
   .loadFromMemory = Retro_Arena_LoadFromMemory,
   .load           = Retro_Arena_Load,
   .saveToMemory   = Retro_Arena_SaveToMemory,
@@ -639,9 +628,9 @@ const struct RETRO_Canvas
 }
 RETRO_CANVAS_NAMESPACE_NAME
 = {
-  .width         = RETRO_CANVAS_DEFAULT_WIDTH, 
-  .height        = RETRO_CANVAS_DEFAULT_HEIGHT,
-  .count         = RETRO_CANVAS_COUNT,
+  .width         = RETRO_DEFAULT_CANVAS_WIDTH, 
+  .height        = RETRO_DEFAULT_CANVAS_HEIGHT,
+  .count         = RETRO_DEFAULT_CANVAS_COUNT,
   .use           = Retro_Canvas_Use,
   .flags         = Retro_Canvas_Flags,
   .clear         = Retro_Canvas_Clear,
@@ -794,7 +783,6 @@ RETRO_API void   Retro_Palette_Set2(U8 index, U8 r, U8 g, U8 b);
     .white = 15,
     .transparent = 16,
     #endif
-
   };
 #elif RETRO_NAMESPACES == 0
 #   define  Palette_Add            Retro_Palette_Add

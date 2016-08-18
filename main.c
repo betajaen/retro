@@ -1,5 +1,5 @@
-#define RETRO_WINDOW_CAPTION "Retro Game"
-#define RETRO_CANVAS_COUNT 2
+#define RETRO_DEFAULT_WINDOW_CAPTION "Retro Game"
+#define RETRO_DEFAULT_CANVAS_COUNT 2
 
 #include "retro.c"
 
