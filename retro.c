@@ -129,23 +129,37 @@ typedef struct
   U8           backgroundColour;
 } RetroP_Canvas;
 
+typedef struct {
+#if defined(RETRO_WINDOWS)
+  HANDLE winHandle;
+  U8 __padding[16 - sizeof(HANDLE)];
+#else
+  U8 __padding[16];
+#endif
+  void(*initFunction)();
+  void(*startFunction)();
+  void(*stepFunction)();
+  void(*settingsFunction)(Retro_Settings*);
+} RetroP_Library;
+
 typedef struct
 {
   // Memory and User Memory
   RetroP_Arena                 mem;
   RetroP_Arena                 arena;
 
+  // Unique Context Id.
+  U32                          id;
+
+  // Library instance, and user functions (init, start and update)
+  RetroP_Library               library;
+
   // User Settings
-  Retro_Settings            settings;
+  Retro_Settings               settings;
 
   // User Scope
   RetroP_ScopeStack            scopeStack[256];
   U32                          scopeStackIndex;
-
-  // User Functions
-  void(*initFunction)();
-  void(*startFunction)();
-  void(*stepFunction)();
 
   // Loaded and Parsed Resources
   RetroP_Bitmap*               bitmaps;
@@ -184,7 +198,6 @@ typedef struct
   char                         tempBrowserPath[256];
   U8*                          musicFileData;
 #endif
-
 } RetroP_Context;
 
 RetroP_Context*   RCTX = NULL;
@@ -223,16 +236,16 @@ void* Retro_Resource_Load(const char* name, U32* outSize)
 #ifdef RETRO_WINDOWS
   assert(outSize);
 
-  HRSRC handle = FindResource(0, name, "RESOURCE");
+  HRSRC handle = FindResource(RCTX->library.winHandle, name, "RESOURCE");
   assert(handle);
 
-  HGLOBAL data = LoadResource(0, handle);
+  HGLOBAL data = LoadResource(RCTX->library.winHandle, handle);
   assert(data);
 
   void* ptr = LockResource(data);
   assert(ptr);
 
-  DWORD dataSize = SizeofResource(0, handle);
+  DWORD dataSize = SizeofResource(RCTX->library.winHandle, handle);
   assert(dataSize);
 
   (*outSize) = dataSize;
@@ -476,6 +489,16 @@ AnimationHandle  Retro_Sprites_LoadAnimationV(BitmapHandle bitmap, U8 numFrames,
   return Retro_Animation_Load(bitmap, numFrames, frameLengthMilliseconds, originX, originY, frameWidth, frameHeight, 0, frameHeight);
 }
 
+S32 Retro_Canvas_Width()
+{
+  return RCTX->settings.canvasWidth;
+}
+
+S32 Retro_Canvas_Height()
+{
+  return RCTX->settings.canvasHeight;
+}
+
 void Retro_Canvas_Use(U8 id)
 {
   assert(id < RCTX->settings.canvasCount);
@@ -597,7 +620,7 @@ void Retro_Canvas_Sprite(SpriteObject* spriteObject)
   Retro_Canvas_Copy(sprite->bitmap, &d, &s, spriteObject->flags);
 }
 
-void  Retro_Canvas_Sprite2(SpriteHandle spriteHandle, S32 x, S32 y, U8 copyFlags)
+void  Retro_Canvas_DrawSprite(SpriteHandle spriteHandle, S32 x, S32 y, U8 copyFlags)
 {
   RetroP_Sprite* sprite = RetroP_SpriteHandle_Get(spriteHandle);
   assert(sprite);
@@ -653,10 +676,10 @@ void  Retro_Canvas_Animate(AnimationObject* animationObject, bool updateTiming)
 
   assert(animationObject->frameNumber < animation->frameCount);
 
-  Retro_Canvas_Animate2(animationObject->animationHandle, animationObject->x, animationObject->y, animationObject->frameNumber, animationObject->flags);
+  Retro_Canvas_DrawAnimation(animationObject->animationHandle, animationObject->x, animationObject->y, animationObject->frameNumber, animationObject->flags);
 }
 
-void  Retro_Canvas_Animate2(AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags)
+void  Retro_Canvas_DrawAnimation(AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags)
 {
   RetroP_Animation* animation = Retro_AnimationHandle_Get(animationHandle);
   assert(animation);
@@ -698,21 +721,13 @@ void  Retro_Palette_Add(Colour colour)
   Retro_Palette_AddImpl(&RCTX->palette, colour);
 }
 
-void  Retro_Palette_Add2(U8 r, U8 g, U8 b)
+void  Retro_Palette_AddRGB(U8 r, U8 g, U8 b)
 {
   Colour colour;
   colour.r = r;
   colour.g = g;
   colour.b = b;
   Retro_Palette_AddImpl(&RCTX->palette, colour);
-}
-
-void Retro_Palette_Add3(U32 rgb)
-{
-  RetroFourByteUnion c;
-  c.q = rgb;
-
-  Retro_Palette_AddImpl(&RCTX->palette, Colour_Make(c.b[2], c.b[1], c.b[0]));
 }
 
 U8 Retro_Palette_IndexImpl(Palette* palette, Colour colour)
@@ -764,7 +779,7 @@ void Retro_Palette_Set(U8 index, Colour colour)
   palette->count = Retro_Max(palette->count, (index + 1));
 }
 
-void Retro_Palette_Set2(U8 index, U8 r, U8 g, U8 b)
+void Retro_Palette_SetRGB(U8 index, U8 r, U8 g, U8 b)
 {
   Palette* palette = &RCTX->palette;
   palette->colours[index] = Colour_Make(r, g, b);
@@ -2133,7 +2148,6 @@ void Canvas_Present()
 
 void Frame()
 {
-
   Retro_Timer_Start(&RCTX->capTimer);
 
   RCTX->deltaTime = Retro_Timer_Ticks(&RCTX->deltaTimer);
@@ -2216,9 +2230,32 @@ void Frame()
 
   Retro_Canvas_Use(0);
   
-  RCTX->stepFunction();
+  RCTX->library.stepFunction();
 
   SDL_SetRenderTarget(RCTX->renderer, NULL);
+
+  if (RCTX->settings.viewport.w != 0)
+  {
+    Rect* r = &RCTX->settings.viewport;
+    SDL_Rect vp;
+    vp.x = r->x;
+    vp.y = r->y;
+    vp.w = r->w;
+    vp.h = r->h;
+    SDL_RenderSetViewport(RCTX->renderer, &vp);
+
+    SDL_Rect clip;
+    clip.x = 0;
+    clip.y = 0;
+    clip.w = r->w;
+    clip.h = r->h;
+    SDL_RenderSetClipRect(RCTX->renderer, &clip);
+  }
+  else
+  {
+    SDL_RenderSetViewport(RCTX->renderer, NULL);
+    SDL_RenderSetClipRect(RCTX->renderer, NULL);
+  }
 
   Canvas_Present();
 
@@ -2237,7 +2274,7 @@ void Restart()
   RCTX->scopeStack[0].p = 0;
   RCTX->scopeStack[0].name = 'INIT';
 
-  RCTX->startFunction();
+  RCTX->library.startFunction();
 }
 
 void InitialiseRetro(const char* caption, U32 width, U32 height)
@@ -2272,6 +2309,9 @@ void InitialiseRetro(const char* caption, U32 width, U32 height)
 
 void RetroLoop()
 {
+  // TODO:
+  //  Cancel out if there is also a RetroLoop running
+  //  We just 'merge' them into two.
 
 #ifdef RETRO_WINDOWS
   while(RCTX->quit == false)
@@ -2291,13 +2331,17 @@ void RetroLoop()
 
 }
 
-void ShutdownRetro()
+void Retro_Shutdown()
 {
   SDL_Quit();
 }
 
 static RetroP_Context* AllocateContextAndArenaBytes(Retro_Settings* settings)
 {
+  static U32 contextId = 0;
+
+  U32 id = contextId++;
+
   // This is essentially one massive allocation, containing the Context and Resources and the Arena at the end.
   U32 nbBytes = 0;
   nbBytes += sizeof(RetroP_Context);
@@ -2310,7 +2354,8 @@ static RetroP_Context* AllocateContextAndArenaBytes(Retro_Settings* settings)
   nbBytes += settings->maxSoundObjects * sizeof(RetroP_SoundObject);
   nbBytes += settings->arenaSize;
 
-  printf("[Retro] Allocating %i bytes, of %i is ROM and %i is RAM\n", nbBytes, nbBytes - settings->arenaSize, settings->arenaSize);
+
+  printf("[Retro:%i] Allocating %i bytes, of %i is ROM and %i is RAM\n", id, nbBytes, nbBytes - settings->arenaSize, settings->arenaSize);
 
   U8* mem = malloc(nbBytes);
   memset(mem, 0, nbBytes);
@@ -2325,21 +2370,20 @@ static RetroP_Context* AllocateContextAndArenaBytes(Retro_Settings* settings)
   context->arena.current = context->arena.begin;
   context->arena.end     = context->arena.begin + settings->arenaSize;
 
+  context->id = id;
   return context;
 }
 
-static void InitContext(Retro_Settings* settings, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
+static void InitContext(Retro_Settings* settings, RetroP_Library* library)
 {
   // Allocate memory, and arena. 
   RCTX = AllocateContextAndArenaBytes(settings);
   memcpy(&RCTX->settings, settings, sizeof(Retro_Settings));
 
-  
-  // Copy in context functions
-  RCTX->initFunction  = InitFunction;
-  RCTX->startFunction = StartFunction;
-  RCTX->stepFunction  = StepFunction;
-  
+
+  // Copy in context library handle (if any), functions
+  memcpy(&RCTX->library, library, sizeof(RetroP_Library));
+
 
   // Loaded Resources
   RCTX->bitmaps       = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxBitmaps,    RetroP_Bitmap);
@@ -2413,23 +2457,23 @@ static void InitContext(Retro_Settings* settings, void(*InitFunction)(), void(*S
 
   if (settings->defaultPalette == 'DB16' || settings->defaultPalette == 'db16')
   {
-    Retro_Palette_Add2(0x14, 0x0c, 0x1c ); // black
-    Retro_Palette_Add2(0x44, 0x24, 0x34 ); // darkRed
-    Retro_Palette_Add2(0x30, 0x34, 0x6d ); // darkBlue
-    Retro_Palette_Add2(0x4e, 0x4a, 0x4e ); // darkGray
-    Retro_Palette_Add2(0x85, 0x4c, 0x30 ); // brown
-    Retro_Palette_Add2(0x34, 0x65, 0x24 ); // darkGreen
-    Retro_Palette_Add2(0xd0, 0x46, 0x48 ); // red
-    Retro_Palette_Add2(0x75, 0x71, 0x61 ); // lightGray
-    Retro_Palette_Add2(0x59, 0x7d, 0xce ); // lightBlue
-    Retro_Palette_Add2(0xd2, 0x7d, 0x2c ); // orange
-    Retro_Palette_Add2(0x85, 0x95, 0xa1 ); // blueGray
-    Retro_Palette_Add2(0x6d, 0xaa, 0x2c ); // lightGreen
-    Retro_Palette_Add2(0xd2, 0xaa, 0x99 ); // peach
-    Retro_Palette_Add2(0x6d, 0xc2, 0xca ); // cyan
-    Retro_Palette_Add2(0xda, 0xd4, 0x5e ); // yellow
-    Retro_Palette_Add2(0xde, 0xee, 0xd6 ); // white
-    Retro_Palette_Add2(0xFF, 0x00, 0xFF ); // magenta/transparent
+    Retro_Palette_AddRGB(0x14, 0x0c, 0x1c ); // black
+    Retro_Palette_AddRGB(0x44, 0x24, 0x34 ); // darkRed
+    Retro_Palette_AddRGB(0x30, 0x34, 0x6d ); // darkBlue
+    Retro_Palette_AddRGB(0x4e, 0x4a, 0x4e ); // darkGray
+    Retro_Palette_AddRGB(0x85, 0x4c, 0x30 ); // brown
+    Retro_Palette_AddRGB(0x34, 0x65, 0x24 ); // darkGreen
+    Retro_Palette_AddRGB(0xd0, 0x46, 0x48 ); // red
+    Retro_Palette_AddRGB(0x75, 0x71, 0x61 ); // lightGray
+    Retro_Palette_AddRGB(0x59, 0x7d, 0xce ); // lightBlue
+    Retro_Palette_AddRGB(0xd2, 0x7d, 0x2c ); // orange
+    Retro_Palette_AddRGB(0x85, 0x95, 0xa1 ); // blueGray
+    Retro_Palette_AddRGB(0x6d, 0xaa, 0x2c ); // lightGreen
+    Retro_Palette_AddRGB(0xd2, 0xaa, 0x99 ); // peach
+    Retro_Palette_AddRGB(0x6d, 0xc2, 0xca ); // cyan
+    Retro_Palette_AddRGB(0xda, 0xd4, 0x5e ); // yellow
+    Retro_Palette_AddRGB(0xde, 0xee, 0xd6 ); // white
+    Retro_Palette_AddRGB(0xFF, 0x00, 0xFF ); // magenta/transparent
 
     RCTX->palette.fallback = 15;
     RCTX->palette.transparent = 16;
@@ -2454,7 +2498,7 @@ static void InitContext(Retro_Settings* settings, void(*InitFunction)(), void(*S
 
   Retro_Canvas_Use(0);
 
-  RCTX->initFunction();
+  RCTX->library.initFunction();
 
   RCTX->quit = false;
 
@@ -2467,20 +2511,76 @@ static void InitContext(Retro_Settings* settings, void(*InitFunction)(), void(*S
 
 }
 
-void ReleaseContext(RetroP_Context* context)
+static void ReleaseContext(RetroP_Context* context)
 {
   SDL_CloseAudio();
   free(RCTX->arena.begin);
   free(RCTX);
 }
 
-int StartRetro(Retro_Settings* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
+RetroP_Library RetroP_LoadLibrary(const char* file, bool asCopy)
 {
-  assert(initialiser);
-  InitialiseRetro(initialiser->caption, initialiser->windowWidth, initialiser->windowHeight);
-  InitContext(initialiser, InitFunction, StartFunction, StepFunction);
+  RetroP_Library library;
+  memset(&library, 0, sizeof(RetroP_Library));
+
+#if defined(RETRO_WINDOWS)
+
+  // TODO: As Copy
+  
+  library.winHandle = LoadLibraryA(file);
+  assert(library.winHandle);
+  
+  library.initFunction      = (void(*)()) GetProcAddress(library.winHandle, "Init");
+  assert(library.initFunction);
+  library.startFunction     = (void(*)()) GetProcAddress(library.winHandle, "Start");
+  assert(library.startFunction);
+  library.stepFunction      = (void(*)()) GetProcAddress(library.winHandle, "Step");
+  assert(library.stepFunction);
+  library.settingsFunction  = (void(*)(Retro_Settings*)) GetProcAddress(library.winHandle, "Settings");
+#else
+
+#endif
+  return library;
+}
+
+int Retro_Start(Retro_Settings* settings, void(*initFunction)(), void(*startFunction)(), void(*stepFunction)())
+{
+  printf("[Retro] Creating Retro Context from runtime\n");
+
+  assert(settings);
+  InitialiseRetro(settings->caption, settings->windowWidth, settings->windowHeight);
+  RetroP_Library library;
+#if defined(RETRO_WINDOWS)
+  library.winHandle = 0;
+#endif
+  library.initFunction = initFunction;
+  library.startFunction = startFunction;
+  library.stepFunction = stepFunction;
+  library.settingsFunction = NULL;
+
+  InitContext(settings, &library);
   RetroLoop();
   return 0; // @TODO Return Context ID.
+}
+
+int Retro_StartFromLibrary(const char* path, U8 flags)
+{
+  printf("[Retro] Creating Retro Context from library %s\n", path);
+  
+  RetroP_Library library = RetroP_LoadLibrary(path, flags & LF_AsCopy);
+  Retro_Settings settings = Retro_Default_Settings;
+
+  if (library.settingsFunction)
+  {
+    library.settingsFunction(&settings);
+  }
+
+  InitialiseRetro(settings.caption, settings.windowWidth, settings.windowHeight);
+  InitContext(&settings, &library);
+
+  RetroLoop();
+
+  return 0;  // @TODO Return ContextID
 }
 
 #undef RETRO_SDL_DRAW_PUSH_RGB

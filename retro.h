@@ -91,18 +91,48 @@
 #endif
 
 #ifndef RETRO_API
-#if defined(RETRO_WINDOWS)
-#if defined(RETRO_IS_LIBRARY)
-#define RETRO_API __declspec(dllexport) extern
-#elif defined(RETRO_LIBRARY)
-#define RETRO_API __declspec(dllimport) extern
-#else
-#define RETRO_API
+#  if defined(RETRO_WINDOWS)
+#     if defined(RETRO_COMPILING_AS_LIBRARY)
+//        LibRetro.dll
+#         define RETRO_API __declspec(dllexport)
+#     elif defined(RETRO_USING_AS_LIBRARY)
+//        LibGame.dll or Game.exe using LibRetro.dll
+#         define RETRO_API __declspec(dllimport)
+#     else
+//        Game.exe with Retro.c #included
+#         define RETRO_API
+#     endif
+#  else
+#         define RETRO_API extern
+#  endif
 #endif
-#else
-#define RETRO_API
+
+#if !defined(RETRO_USER_INIT_API)
+#  if defined(RETRO_WINDOWS)
+#     if defined(RETRO_COMPILING_AS_LIBRARY)
+//        LibRetro.dll
+#         define RETRO_USER_INIT_API 
+#         define RETRO_USER_START_API 
+#         define RETRO_USER_STEP_API 
+#         define RETRO_USER_SETTINGS_API
+#     elif defined(RETRO_USING_AS_LIBRARY)
+//        LibGame.dll or Game.exe using LibRetro.dll
+#         define RETRO_USER_INIT_API      __declspec(dllexport)
+#         define RETRO_USER_START_API     __declspec(dllexport)
+#         define RETRO_USER_STEP_API      __declspec(dllexport)
+#         define RETRO_USER_SETTINGS_API  extern
+#     else
+//        Game.exe with Retro.c #included
+#         define RETRO_USER_INIT_API
+#         define RETRO_USER_START_API
+#         define RETRO_USER_STEP_API
+#         define RETRO_USER_SETTINGS_API
+#     endif
+#  else
+#         define RETRO_API extern
+#  endif
 #endif
-#endif
+
 
 #if (RETRO_NAMESPACES == 1)
 
@@ -140,6 +170,10 @@
 
 #ifndef RETRO_FONT_NAMESPACE_NAME
 #define RETRO_FONT_NAMESPACE_NAME font
+#endif
+
+#ifndef RETRO_TIMER_NAMESPACE_NAME
+#define RETRO_TIMER_NAMESPACE_NAME timer
 #endif
 
 #ifndef RETRO_DEFAULT_PALETTE
@@ -277,7 +311,7 @@ RETRO_API Point  Point_Make(S32 x, S32 y);
 RETRO_API Size   Size_Make(U32 w, U32 h);
 RETRO_API Rect   Rect_Make(S32 x, S32 y, S32 w, S32 h);
 
-#ifdef RETRO_SHORTHAND
+#if defined(RETRO_SHORTHAND)
 #   define _RGB(STR)           Hex_Colour(STR)
 #   define _POINT(X, Y)        Point_Make(X, Y)
 #   define _RECT(X, Y, W, H)   Rect_Make(X, Y, W, H)
@@ -286,13 +320,12 @@ RETRO_API Rect   Rect_Make(S32 x, S32 y, S32 w, S32 h);
 #   define _MEGABYTES(BYTES)   RETRO_MEGABYTES(BYTES)
 #endif
 
-
-
 typedef struct
 {
   const char* caption;
   U32         windowWidth, windowHeight;
   U32         canvasWidth, canvasHeight;
+  Rect        viewport;
   int         defaultPalette;
   float       soundVolume;
   U32         frameRate;
@@ -310,47 +343,61 @@ typedef struct
 } Retro_Settings;
 
 const Retro_Settings Retro_Default_Settings = {
-  .caption                 = RETRO_DEFAULT_WINDOW_CAPTION,
-  .windowWidth             = RETRO_DEFAULT_WINDOW_WIDTH,
-  .windowHeight            = RETRO_DEFAULT_WINDOW_HEIGHT,
+  RETRO_DEFAULT_WINDOW_CAPTION,
+  RETRO_DEFAULT_WINDOW_WIDTH,
+  RETRO_DEFAULT_WINDOW_HEIGHT,
+  RETRO_DEFAULT_CANVAS_WIDTH,
+  RETRO_DEFAULT_CANVAS_HEIGHT,
+  { 0, 0, 0, 0 },
   #ifdef RETRO_DEFAULT_PALETTE
-  .defaultPalette          = RETRO_DEFAULT_PALETTE,
+  RETRO_DEFAULT_PALETTE,
   #else
-  .defaultPalette          = 0,
+  0,
   #endif
-  .canvasWidth             = RETRO_DEFAULT_CANVAS_WIDTH,
-  .canvasHeight            = RETRO_DEFAULT_CANVAS_HEIGHT,
-  .soundVolume             = RETRO_DEFAULT_SOUND_DEFAULT_VOLUME,
-  .frameRate               = RETRO_DEFAULT_FRAME_RATE,
-  .arenaSize               = RETRO_DEFAULT_ARENA_SIZE,
-  .maxInputActions         = RETRO_DEFAULT_MAX_INPUT_ACTIONS,
-  .maxBitmaps              = RETRO_DEFAULT_MAX_BITMAPS,
-  .maxSounds               = RETRO_DEFAULT_MAX_SOUNDS,
-  .maxAnimations           = RETRO_DEFAULT_MAX_ANIMATIONS,
-  .maxSprites              = RETRO_DEFAULT_MAX_SPRITES,
-  .canvasCount             = RETRO_DEFAULT_CANVAS_COUNT,
-  .maxSoundObjects         = RETRO_DEFAULT_MAX_SOUND_OBJECTS,
-  .audioFrequency          = RETRO_DEFAULT_AUDIO_FREQUENCY,
-  .audioChannels           = RETRO_DEFAULT_AUDIO_CHANNELS,
-  .audioSamples            = RETRO_DEFAULT_AUDIO_SAMPLES
+  RETRO_DEFAULT_SOUND_DEFAULT_VOLUME,
+  RETRO_DEFAULT_FRAME_RATE,
+  RETRO_DEFAULT_ARENA_SIZE,
+  RETRO_DEFAULT_MAX_INPUT_ACTIONS,
+  RETRO_DEFAULT_MAX_BITMAPS,
+  RETRO_DEFAULT_MAX_SOUNDS,
+  RETRO_DEFAULT_MAX_ANIMATIONS,
+  RETRO_DEFAULT_MAX_SPRITES,
+  RETRO_DEFAULT_CANVAS_COUNT,
+  RETRO_DEFAULT_MAX_SOUND_OBJECTS,
+  RETRO_DEFAULT_AUDIO_FREQUENCY,
+  RETRO_DEFAULT_AUDIO_CHANNELS,
+  RETRO_DEFAULT_AUDIO_SAMPLES
 };
 
-RETRO_API int  StartRetro(Retro_Settings* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)());
+// 
+RETRO_API int  Retro_Start(Retro_Settings* settings, void(*initFunction)(), void(*startFunction)(), void(*stepFunction)());
 
-RETRO_API void ShutdownRetro();
+// 
+RETRO_API void Retro_Shutdown();
 
-#if !(defined(RETRO_IS_LIBRARY) || defined(RETRO_LIBRARY))
+typedef enum
+{
+  LF_None   = 0,
+  LF_AsCopy = (1 << 0),
+} RetroLibraryFlags;
 
-void  Init();
-void  Start();
-void  Step();
+RETRO_API int Retro_StartFromLibrary(const char* libraryPath, U8 libraryFlags);
+
+#if !(defined(RETRO_COMPILING_AS_LIBRARY) || defined(RETRO_USING_RETRO_AS_LIBRARY) )
+
+RETRO_USER_INIT_API  void Init();
+RETRO_USER_START_API void Start();
+RETRO_USER_STEP_API  void Step();
+
+RETRO_API void Retro_Scope_Push(int name);
 
 #ifndef RETRO_NO_MAIN
+#define RETRO_NO_MAIN
 int main(int argc, char *argv[])
 {
   Retro_Settings settings = Retro_Default_Settings;
-  StartRetro(&settings, Init, Start, Step);
-  ShutdownRetro();
+  Retro_Start(&settings, Init, Start, Step);
+  Retro_Shutdown();
   return 0;
 }
 #endif
@@ -388,12 +435,15 @@ RETRO_ARENA_NAMESPACE_NAME
   .saveToMemory   = Retro_Arena_SaveToMemory,
   .save           = Retro_Arena_Save
 };
-#elif RETRO_NAMESPACES == 0
-#define Arena_LoadFromMemory(U8_PTR_mem, BOOL_loadMusic)    Retro_Arena_LoadFromMemory(U8_PTR_mem, BOOL_loadMusic)
-#define Arena_Load(CONST_CHAR_filename, BOOL_loadMusic)     Retro_Arena_Load(CONST_CHAR_filename, BOOL_loadMusic)
-#define Arena_SaveToMemory(U32_PTR_outSize)                 Retro_Arena_SaveToMemory(U32_PTR_outSize)
-#define Arena_Save(CONST_CHAR_filename)                     Retro_Arena_Save(CONST_CHAR_filename)
 #endif
+
+#if defined(RETRO_SHORTHAND)
+#   define Arena_LoadFromMemory       Retro_Arena_LoadFromMemory
+#   define Arena_Load                 Retro_Arena_Load
+#   define Arena_SaveToMemory         Retro_Arena_SaveToMemory
+#   define Arena_Save                 Retro_Arena_Save
+#endif
+
 
 
 
@@ -424,18 +474,20 @@ const struct RETRO_Scope
 }
 RETRO_SCOPE_NAMESPACE_NAME
 = {
-  .push = Retro_Scope_Push,
-  .pop  = Retro_Scope_Pop,
-  .name = Retro_Scope_Name,
-  .obtain = Retro_Scope_Obtain,
-  .rewind = Retro_Scope_Rewind,
+  Retro_Scope_Push,
+  Retro_Scope_Pop,
+  Retro_Scope_Name,
+  Retro_Scope_Obtain,
+  Retro_Scope_Rewind,
 };
-#elif RETRO_NAMESPACES == 0
-#define Scope_Push(INT_name)                Retro_Scope_Push(INT_name)
-#define Scope_Name()                        Retro_Scope_Name()
-#define Scope_Obtain(U32_size)              Retro_Scope_Obtain(U32_size)
-#define Scope_Rewind()                      Retro_Scope_Rewind()
-#define Scope_Pop()                         Retro_Scope_Pop()
+#endif
+
+#if defined(RETRO_SHORTHAND)
+#   define Scope_Push              Retro_Scope_Push
+#   define Scope_Name              Retro_Scope_Name
+#   define Scope_Obtain            Retro_Scope_Obtain
+#   define Scope_Rewind            Retro_Scope_Rewind
+#   define Scope_Pop               Retro_Scope_Pop
 #endif
 
 
@@ -473,13 +525,15 @@ const struct RETRO_Resources
 }
 RETRO_RESOURCES_NAMESPACE_NAME
 = {
-  .loadPalette   = Retro_Resources_LoadPalette,
-  .loadBitmap    = Retro_Resources_LoadBitmap,
-  .loadSound     = Retro_Resources_LoadSound,
-  .loadFont      = Retro_Resources_LoadFont,
-  .loadFontFixed = Retro_Resources_LoadFontFixed
+  Retro_Resources_LoadPalette,
+  Retro_Resources_LoadBitmap,
+  Retro_Resources_LoadSound,
+  Retro_Resources_LoadFont,
+  Retro_Resources_LoadFontFixed
 };
-#elif RETRO_NAMESPACES == 0
+#endif
+
+#if defined(RETRO_SHORTHAND)
 #  define  Resources_LoadPalette      Retro_Resources_LoadPalette
 #  define  Resources_LoadBitmap       Retro_Resources_LoadBitmap
 #  define  Resources_LoadSound        Retro_Resources_LoadSound
@@ -515,20 +569,22 @@ const struct RETRO_Sprites
 }
 RETRO_SPRITES_NAMESPACE_NAME
 = {
-  .loadSprite          = Retro_Sprites_LoadSprite,
-  .loadAnimationH      = Retro_Sprites_LoadAnimationH,
-  .loadAnimationV      = Retro_Sprites_LoadAnimationV,
-  .newAnimation = Retro_Sprites_NewAnimationObject,
-  .playAnimation = Retro_Sprites_PlayAnimationObject,
-  .setAnimation  = Retro_Sprites_SetAnimationObject
+  Retro_Sprites_LoadSprite,
+  Retro_Sprites_LoadAnimationH,
+  Retro_Sprites_LoadAnimationV,
+  Retro_Sprites_NewAnimationObject,
+  Retro_Sprites_PlayAnimationObject,
+  Retro_Sprites_SetAnimationObject
 };
-#elif RETRO_NAMESPACES == 0
-#define Sprites_LoadSprite              Retro_Sprites_LoadSprite
-#define Sprites_LoadAnimationH          Retro_Sprites_LoadAnimationH
-#define Sprites_LoadAnimationV          Retro_Sprites_LoadAnimationV
-#define Sprites_MakeAnimationObject     Retro_Sprites_MakeAnimationObject
-#define Sprites_PlayAnimationObject     Retro_Sprites_PlayAnimationObject
-#define Sprites_SetAnimationObject      Retro_Sprites_SetAnimationObject
+#endif
+
+#if defined(RETRO_SHORTHAND)
+#   define Sprites_LoadSprite              Retro_Sprites_LoadSprite
+#   define Sprites_LoadAnimationH          Retro_Sprites_LoadAnimationH
+#   define Sprites_LoadAnimationV          Retro_Sprites_LoadAnimationV
+#   define Sprites_MakeAnimationObject     Retro_Sprites_MakeAnimationObject
+#   define Sprites_PlayAnimationObject     Retro_Sprites_PlayAnimationObject
+#   define Sprites_SetAnimationObject      Retro_Sprites_SetAnimationObject
 #endif
 
 
@@ -569,6 +625,10 @@ typedef enum
   FP_Scale
 } Retro_CanvasPresentation;
 
+RETRO_API S32   Retro_Canvas_Width();
+
+RETRO_API S32   Retro_Canvas_Height();
+
 RETRO_API void  Retro_Canvas_Use(U8 canvasIndex);
 
 RETRO_API void  Retro_Canvas_Clear();
@@ -583,11 +643,7 @@ RETRO_API void  Retro_Canvas_Copy2(BitmapHandle bitmap, S32 dstX, S32 dstY, S32 
 
 RETRO_API void  Retro_Canvas_Sprite(SpriteObject* spriteObject);
 
-RETRO_API void  Retro_Canvas_Sprite2(SpriteHandle sprite, S32 x, S32 y, U8 flipFlags);
-
 RETRO_API void  Retro_Canvas_Animate(AnimationObject* animationObject, bool updateTiming);
-
-RETRO_API void  Retro_Canvas_Animate2(AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags);
 
 RETRO_API void  Retro_Canvas_DrawPalette(S32 y);
 
@@ -596,6 +652,10 @@ RETRO_API void  Retro_Canvas_DrawPalette2(S32 y, U8 from, U8 to);
 RETRO_API void  Retro_Canvas_DrawBox(U8 colour, Rect rect);
 
 RETRO_API void  Retro_Canvas_DrawRectangle(U8 colour, Rect rect);
+
+RETRO_API void  Retro_Canvas_DrawSprite(SpriteHandle sprite, S32 x, S32 y, U8 flipFlags);
+
+RETRO_API void  Retro_Canvas_DrawAnimation(AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags);
 
 RETRO_API void  Retro_Canvas_Print(S32 x, S32 y, Font* font, U8 colour, const char* str);
 
@@ -606,64 +666,67 @@ RETRO_API void  Retro_Canvas_MonoPrint(S32 x, S32 y, S32 w, Font* font, U8 colou
 #if RETRO_NAMESPACES == 1
 const struct RETRO_Canvas
 {
-  S32  width, height;
-  U32  count;
-  
+  S32  (*width)();
+  S32  (*height)();
   void (*use)(U8 canvasIndex);
   void (*flags)(U8 id, U8 flags, U8 clearColour);
   void (*clear)();
   void (*copy)(BitmapHandle bitmap, Rect* dstRectangle, Rect* srcRectangle, U8 copyFlags);
   void (*copy2)(BitmapHandle bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags);
   void (*sprite)(SpriteObject* spriteObject);
-  void (*sprite2)(SpriteHandle sprite, S32 x, S32 y, U8 flipFlags);
   void (*animate)(AnimationObject* animationObject, bool updateTiming);
-  void (*animate2)(AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags);
   void (*drawPalette)(S32 y);
   void (*drawPalette2)(S32 y, U8 from, U8 to);
   void (*drawBox)(U8 colour, Rect rect);
   void (*drawRectangle)(U8 colour, Rect rect);
+  void (*drawSprite)(SpriteHandle sprite, S32 x, S32 y, U8 flipFlags);
+  void (*drawAnimation)(AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags);
   void (*print)(S32 x, S32 y, Font* font, U8 colour, const char* str);
   void (*printf)(S32 x, S32 y, Font* font, U8 colour, const char* fmt, ...);
   void (*monoPrint)(S32 x, S32 y, S32 w, Font* font, U8 colour, const char* str);
 }
 RETRO_CANVAS_NAMESPACE_NAME
 = {
-  .width         = RETRO_DEFAULT_CANVAS_WIDTH, 
-  .height        = RETRO_DEFAULT_CANVAS_HEIGHT,
-  .count         = RETRO_DEFAULT_CANVAS_COUNT,
-  .use           = Retro_Canvas_Use,
-  .flags         = Retro_Canvas_Flags,
-  .clear         = Retro_Canvas_Clear,
-  .copy          = Retro_Canvas_Copy,
-  .copy2         = Retro_Canvas_Copy2,
-  .sprite        = Retro_Canvas_Sprite,
-  .sprite2       = Retro_Canvas_Sprite2,
-  .animate       = Retro_Canvas_Animate,
-  .animate2      = Retro_Canvas_Animate2,
-  .drawBox       = Retro_Canvas_DrawBox,
-  .drawRectangle = Retro_Canvas_DrawRectangle,
-  .drawPalette   = Retro_Canvas_DrawPalette,
-  .drawPalette2  = Retro_Canvas_DrawPalette2,
-  .print         = Retro_Canvas_Print,
-  .printf        = Retro_Canvas_Printf,
-  .monoPrint     = Retro_Canvas_MonoPrint
+  Retro_Canvas_Width,
+  Retro_Canvas_Height,
+  Retro_Canvas_Use,
+  Retro_Canvas_Flags,
+  Retro_Canvas_Clear,
+  Retro_Canvas_Copy,
+  Retro_Canvas_Copy2,
+  Retro_Canvas_Sprite,
+  Retro_Canvas_Animate,
+  Retro_Canvas_DrawPalette,
+  Retro_Canvas_DrawPalette2,
+  Retro_Canvas_DrawBox,
+  Retro_Canvas_DrawRectangle,
+  Retro_Canvas_DrawSprite,
+  Retro_Canvas_DrawAnimation,
+  Retro_Canvas_Print,
+  Retro_Canvas_Printf,
+  Retro_Canvas_MonoPrint
 };
-#elif RETRO_NAMESPACES == 0
-#define Canvas_Use(U8_canvasIndex)                                                                Retro_Canvas_Use(U8_canvasIndex)
-#define Canvas_Clear()                                                                            Retro_Canvas_Clear()
-#define Canvas_Flags(U8_id, U8_flags, U8_clearColour)                                             Retro_Canvas_Flags(U8_id, U8_flags, U8_clearColour)
-#define Canvas_Presentation(CANVASPRESENTATION_presentation, FLOAT_alpha, FLOAT_beta)             Retro_Canvas_Presentation(CANVASPRESENTATION_presentation, FLOAT_alpha, FLOAT_beta)
-#define Canvas_Copy(BITMAP, RECT_dstRect, RECT_srcRect, U8_copyFlags)                             Retro_Canvas_Copy(BITMAP, RECT_dstRect, RECT_srcRect, U8_copyFlags)
-#define Canvas_Copy2(BITMAP, S32_dstX, S32_dstY, S32_srcX, S32_srcY, S32_w, S32_h, U8_copyFlags)  Retro_Canvas_Copy2(BITMAP, S32_dstX, S32_dstY, S32_srcX, S32_srcY, S32_w, S32_h, U8_copyFlags)
-#define Canvas_Sprite(SPRITEOBJECT)                                                               Retro_Canvas_Sprite(SPRITEOBJECT)
-#define Canvas_Sprite2(SPRITEHANDLE, S32_x, S32_y, U8_flipFlags)                                  Retro_Canvas_Sprite2(SPRITEHANDLE, S32_x, S32_y, U8_flipFlags)
-#define Canvas_Animate(ANIMATIONOBJECT, BOOL_updateTiming)                                        Retro_Canvas_Animate(ANIMATIONOBJECT, BOOL_updateTiming)
-#define Canvas_Animate2(ANIMATIONHANDLE, S32_x, S32_y, U8_frame, U8_copyFlags)                    Retro_Canvas_Animate2(ANIMATIONHANDLE, S32_x, S32_y, U8_frame, U8_copyFlags)
-#define Canvas_DrawPalette(S32_y)                                                                 Retro_Canvas_DrawPalette(S32_y)
-#define Canvas_DrawBox(U8_colour, RECT_rect)                                                      Retro_Canvas_DrawBox(U8_colour, RECT_rect)
-#define Canvas_DrawRectangle(U8_colour, RECT_rect)                                                Retro_Canvas_DrawRectangle(U8_colour, RECT_rect)
-#define Canvas_Print(S32_x, S32_y, FONT, U8_colour, CONST_CHAR_str)                               Retro_Canvas_Print(S32_x, S32_y, FONT, U8_colour, CONST_CHAR_str)
-#define Canvas_Printf(S32_x, S32_y, FONT_font, U8_colour, CONST_CHAR_fmt, ...)                    Retro_Canvas_Printf(S32_x, S32_y, FONT_font, U8_colour, CONST_CHAR_fmt, __VA_ARGS__)
+#endif
+
+#if defined(RETRO_SHORTHAND)
+#   define Canvas_Width                                    Retro_Canvas_Width
+#   define Canvas_Height                                   Retro_Canvas_Height
+#   define Canvas_Use                                      Retro_Canvas_Use
+#   define Canvas_Flags                                    Retro_Canvas_Flags
+#   define Canvas_Clear                                    Retro_Canvas_Clear
+#   define Canvas_Copy                                     Retro_Canvas_Copy
+#   define Canvas_Copy2                                    Retro_Canvas_Copy2
+#   define Canvas_Sprite                                   Retro_Canvas_Sprite
+#   define Canvas_Sprite2                                  Retro_Canvas_DrawSprite
+#   define Canvas_Animate                                  Retro_Canvas_Animate
+#   define Canvas_Animate2                                 Retro_Canvas_DrawAnimation
+#   define Canvas_DrawBox                                  Retro_Canvas_DrawBox
+#   define Canvas_DrawRectangle                            Retro_Canvas_DrawRectangle
+#   define Canvas_DrawPalette                              Retro_Canvas_DrawPalette
+#   define Canvas_DrawPalette2                             Retro_Canvas_DrawPalette2
+#   define Canvas_Print                                    Retro_Canvas_Print
+#   define Canvas_Printf                                   Retro_Canvas_Printf
+#   define Canvas_MonoPrint                                Retro_Canvas_MonoPrint
 #endif
 
 
@@ -693,98 +756,65 @@ RETRO_API void  Retro_Audio_StopMusic();
   }
   RETRO_AUDIO_NAMESPACE_NAME
   = {
-    .playSound   = Retro_Audio_PlaySound,
-    .clearSounds = Retro_Audio_ClearSounds,
-    .playMusic   = Retro_Audio_PlayMusic,
-    .stopMusic   = Retro_Audio_StopMusic
+    Retro_Audio_PlaySound,
+    Retro_Audio_ClearSounds,
+    Retro_Audio_PlayMusic,
+    Retro_Audio_StopMusic
   };
-#elif RETRO_NAMESPACES == 0
-#define    Audio_PlaySound              Retro_Audio_PlaySound
-#define    Audio_ClearSounds            Retro_Audio_ClearSounds
-#define    Audio_PlayMusic              Retro_Audio_PlayMusic
-#define    Audio_StopMusic              Retro_Audio_StopMusic
 #endif
 
-RETRO_API void  Retro_Palette_Add(Colour colour);
+#if defined(RETRO_SHORTHAND)
+#   define    Audio_PlaySound              Retro_Audio_PlaySound
+#   define    Audio_ClearSounds            Retro_Audio_ClearSounds
+#   define    Audio_PlayMusic              Retro_Audio_PlayMusic
+#   define    Audio_StopMusic              Retro_Audio_StopMusic
+#endif
 
-RETRO_API void  Retro_Palette_Add2(U8 r, U8 g, U8 b);
+RETRO_API void   Retro_Palette_Add(Colour colour);
 
-RETRO_API void  Retro_Palette_Add3(U32 rgb);
+RETRO_API void   Retro_Palette_AddRGB(U8 r, U8 g, U8 b);
 
-RETRO_API U8    Retro_Palette_Index(Colour colour);
+RETRO_API U8     Retro_Palette_Index(Colour colour);
 
-RETRO_API bool  Retro_Palette_Has(Colour colour);
+RETRO_API bool   Retro_Palette_Has(Colour colour);
 
 RETRO_API Colour Retro_Palette_Get(U8 index);
 
 RETRO_API void   Retro_Palette_Set(U8 index, Colour colour);
 
-RETRO_API void   Retro_Palette_Set2(U8 index, U8 r, U8 g, U8 b);
+RETRO_API void   Retro_Palette_SetRGB(U8 index, U8 r, U8 g, U8 b);
 
 #if RETRO_NAMESPACES == 1
   const struct RETRO_Palette {
-    void (*add)(Colour colour);
-    void (*add2)(U8 r, U8 g, U8 b);
-    void (*addRGB)(U32 argb);
-    void (*addAt)(U8 index, Colour colour);
-    U8   (*index)(Colour colour);
-    bool (*has)(Colour colour);
+    void   (*add)(Colour colour);
+    void   (*addRGB)(U8 r, U8 g, U8 b);
+    U8     (*index)(Colour colour);
+    bool   (*has)(Colour colour);
     Colour (*get)(U8 index);
-    void  (*set)(U8 index, Colour colour);
-    void  (*set2)(U8 index, U8 r, U8 g, U8 b);
-
+    void   (*set)(U8 index, Colour colour);
+    void   (*setRGB)(U8 index, U8 r, U8 g, U8 b);
 #if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
-    U8 black;
-    U8 darkRed;
-    U8 darkBlue;
-    U8 darkGray;
-    U8 brown;
-    U8 darkGreen;
-    U8 red;
-    U8 lightGray;
-    U8 lightBlue;
-    U8 orange;
-    U8 blueGray;
-    U8 lightGreen;
-    U8 peach;
-    U8 cyan;
-    U8 yellow;
-    U8 white;
-    U8 transparent;
+    U8 black, darkRed, darkBlue, darkGray, brown, darkGreen, red, lightGray, 
+       lightBlue, orange, blueGray, lightGreen, peach, cyan, yellow, white,
+       transparent;
 #endif
   }
   RETRO_PALETTE_NAMESPACE_NAME
   = {
-    .add     = Retro_Palette_Add,
-    .addRGB  = Retro_Palette_Add3,
-    .index   = Retro_Palette_Index,
-    .has     = Retro_Palette_Has,
-    .get     = Retro_Palette_Get,
-    .set     = Retro_Palette_Set,
-    .set2    = Retro_Palette_Set2
-    
+    Retro_Palette_Add,
+    Retro_Palette_AddRGB,
+    Retro_Palette_Index,
+    Retro_Palette_Has,
+    Retro_Palette_Get,
+    Retro_Palette_Set,
+    Retro_Palette_SetRGB
     #if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
-    , 
-    .black = 0,
-    .darkRed = 1,
-    .darkBlue = 2,
-    .darkGray = 3,
-    .brown = 4,
-    .darkGreen = 5,
-    .red = 6,
-    .lightGray = 7,
-    .lightBlue = 8,
-    .orange = 9,
-    .blueGray = 10,
-    .lightGreen = 11,
-    .peach = 12,
-    .cyan = 13,
-    .yellow = 14,
-    .white = 15,
-    .transparent = 16,
+    ,  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
     #endif
   };
-#elif RETRO_NAMESPACES == 0
+#endif
+
+#if defined(RETRO_SHORTHAND)
 #   define  Palette_Add            Retro_Palette_Add
 #   define  Palette_Add2           Retro_Palette_Add2
 #   define  Palette_AddRGB         Retro_Palette_AddARGB
@@ -830,16 +860,18 @@ RETRO_API S16   Retro_Input_DeltaAxis(int action);
   }
   RETRO_INPUT_NAMESPACE_NAME
   = {
-    .textInput = Retro_Input_TextInput,
-    .bindKey   = Retro_Input_BindKey,
-    .bindAxis  = Retro_Input_BindAxis,
-    .down      = Retro_Input_Down,
-    .released  = Retro_Input_Released,
-    .pressed   = Retro_Input_Pressed,
-    .axis      = Retro_Input_Axis,
-    .deltaAxis = Retro_Input_DeltaAxis
+    Retro_Input_TextInput,
+    Retro_Input_BindKey,
+    Retro_Input_BindAxis,
+    Retro_Input_Down,
+    Retro_Input_Released,
+    Retro_Input_Pressed,
+    Retro_Input_Axis,
+    Retro_Input_DeltaAxis
   };
-#elif RETRO_NAMESPACES == 0
+#endif
+
+#if defined(RETRO_SHORTHAND)
 #   define Input_TextInput           Retro_Input_TextInput
 #   define Input_BindKey             Retro_Input_BindKey
 #   define Input_BindAxis            Retro_Input_BindAxis
@@ -850,23 +882,23 @@ RETRO_API S16   Retro_Input_DeltaAxis(int action);
 #   define Input_DeltaAxis           Retro_Input_DeltaAxis
 
 #if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
-#define Colour_black 0 
-#define Colour_darkRed 1 
-#define Colour_darkBlue 2 
-#define Colour_darkGray 3 
-#define Colour_brown 4 
-#define Colour_darkGreen 5 
-#define Colour_red 6 
-#define Colour_lightGray 7 
-#define Colour_lightBlue 8 
-#define Colour_orange 9 
-#define Colour_blueGray 10 
-#define Colour_lightGreen 11 
-#define Colour_peach 12 
-#define Colour_cyan 13 
-#define Colour_yellow 14 
-#define Colour_white 15 
-#define Colour_transparent 16 
+#   define Colour_black 0 
+#   define Colour_darkRed 1 
+#   define Colour_darkBlue 2 
+#   define Colour_darkGray 3 
+#   define Colour_brown 4 
+#   define Colour_darkGreen 5 
+#   define Colour_red 6 
+#   define Colour_lightGray 7 
+#   define Colour_lightBlue 8 
+#   define Colour_orange 9 
+#   define Colour_blueGray 10 
+#   define Colour_lightGreen 11 
+#   define Colour_peach 12 
+#   define Colour_cyan 13 
+#   define Colour_yellow 14 
+#   define Colour_white 15 
+#   define Colour_transparent 16 
 #endif
 
 #endif
@@ -909,22 +941,20 @@ RETRO_API bool  Retro_Timer_Paused(Timer* timer);
     bool (*started)(Timer* timer);
     bool (*paused)(Timer* timer);
   } 
-  #ifdef RETRO_TIMER_IS
-    RETRO_TIMER_IS
-  #else
-    timer
-  #endif
+RETRO_TIMER_NAMESPACE_NAME
   = {
-    .make    = Retro_Timer_Make,
-    .start   = Retro_Timer_Start,
-    .stop    = Retro_Timer_Stop,
-    .pause   = Retro_Timer_Pause,
-    .unpause = Retro_Timer_Unpause,
-    .ticks   = Retro_Timer_Ticks,
-    .started = Retro_Timer_Started,
-    .paused  = Retro_Timer_Paused,
+    Retro_Timer_Make,
+    Retro_Timer_Start,
+    Retro_Timer_Stop,
+    Retro_Timer_Pause,
+    Retro_Timer_Unpause,
+    Retro_Timer_Ticks,
+    Retro_Timer_Started,
+    Retro_Timer_Paused,
   };
-#elif RETRO_NAMESPACES == 0
+#endif
+
+#if defined(RETRO_SHORTHAND)
 #   define Timer_Make(TIMER)      Retro_TimerMake(TIMER)
 #   define Timer_Start(TIMER)     Retro_Timer_Start(TIMER)
 #   define Timer_Stop(TIMER)      Retro_Timer_Stop(TIMER)

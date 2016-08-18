@@ -64,7 +64,7 @@ void Start()
 {
   state = Retro_Scope_New(GameState);
 
-  sprites.newAnimation(&state->player, ANIMATEDSPRITE_QUOTE_WALK, canvas.width / 2, canvas.height / 2);
+  sprites.newAnimation(&state->player, ANIMATEDSPRITE_QUOTE_WALK, canvas.width() / 2, canvas.height() / 2);
   sprites.playAnimation(&state->player, true, true);
 
   state->velocity.x = 0;
@@ -74,6 +74,8 @@ void Start()
   timer.start(&TIMER);
 
   audio.playMusic("origin.mod");
+
+  //Retro_StartFromLibrary("LibGame.dll", LF_AsCopy);
 }
 
 void Step()
@@ -138,9 +140,9 @@ void Step()
     state->player.x = 0;
     state->velocity.x = 0;
   }
-  else if (state->player.x + state->player.w > canvas.width)
+  else if (state->player.x + state->player.w > canvas.width())
   {
-    state->player.x = canvas.width - state->player.w;
+    state->player.x = canvas.width() - state->player.w;
     state->velocity.x = 0;
   }
 
@@ -160,7 +162,7 @@ void Step()
   }
 
   canvas.use(0);
-  state->player.x -= 10; // .
+  state->player.x -= 10;
   canvas.animate(&state->player, true);
   state->player.x += 10;
   
