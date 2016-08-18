@@ -3,6 +3,10 @@
 
 #include "retro.h"
 
+#ifndef RETRO_MAX_CONTEXT
+#define RETRO_MAX_CONTEXT 2
+#endif
+
 #ifdef RETRO_WINDOWS
 #   include "windows.h"
 #endif
@@ -23,14 +27,7 @@
 typedef struct
 {
   U8 *begin, *end, *current;
-} RetroP_LinearAllocator;
-
-void RetroP_LinearAllocator_Make(RetroP_LinearAllocator* allocator, U32 size)
-{
-  allocator->begin = malloc(size);
-  allocator->end = allocator->begin + size;
-  allocator->current = allocator->begin;
-}
+} RetroP_Arena;
 
 typedef struct
 {
@@ -80,7 +77,7 @@ typedef struct
   RetroP_Sound* sound;
   U32    p;
   U8     volume;
-} Retro_SoundObject;
+} RetroP_SoundObject;
 
 typedef struct
 {
@@ -110,17 +107,12 @@ typedef union
 
 #define RETRO_BROWSER_PATH ((const char*) (RCTX->tempBrowserPath))
 
-#define RETRO_MAKE_BROWSER_PATH(N) \
-  RCTX->tempBrowserPath[0] = 0; \
+#define RETRO_MAKE_BROWSER_PATH(N)          \
+  RCTX->tempBrowserPath[0] = 0;             \
   strcat(RCTX->tempBrowserPath, "assets/"); \
   strcat(RCTX->tempBrowserPath, name)
 
 #endif
-
-
-SDL_Window*                    sdlWindow;
-U16                            windowWidth;
-U16                            windowHeight;
 
 typedef struct
 {
@@ -131,29 +123,41 @@ typedef struct
 
 typedef struct
 {
-  SDL_Renderer*                renderer;
-  RetroP_LinearAllocator       arena;
-  RetroP_ScopeStack            scopeStack[256];
-  U32                          scopeStackIndex;
-  
-  Palette                      palette;
+  // Memory and User Memory
+  RetroP_Arena                 mem;
+  RetroP_Arena                 arena;
 
+  // User Settings
   Retro_Initialiser            settings;
 
-  // Canvas
+  // User Scope
+  RetroP_ScopeStack            scopeStack[256];
+  U32                          scopeStackIndex;
+
+  // User Functions
+  void(*initFunction)();
+  void(*startFunction)();
+  void(*stepFunction)();
+
+  // Loaded and Parsed Resources
+  RetroP_Bitmap*               bitmaps;
+  RetroP_Sprite*               sprites;
+  RetroP_Animation*            animations;
+  RetroP_Sound*                sounds;
+
+  // Canvas and Rendering
+  Palette                      palette;
+
+  SDL_Renderer*                renderer;
   SDL_Texture*                 canvasTexture;
   RetroP_Canvas*               canvas;
-
-//  SDL_Texture*               canvasTextures[RETRO_CANVAS_COUNT];
-//  U8                         canvasFlags[RETRO_CANVAS_COUNT];
-//  U8                         canvasBackgroundColour[RETRO_CANVAS_COUNT];
   Retro_CanvasPresentation     framePresentation;
   float                        frameAlpha, frameBeta;
 
   // Input
   char                         inputChar;
   RetroP_InputCharState        inputCharState;
-  RetroP_InputActionBinding    inputActions[RETRO_MAX_INPUT_ACTIONS];
+  RetroP_InputActionBinding*   inputActions;
   
   // Events and Timing
   bool                         quit;
@@ -164,16 +168,11 @@ typedef struct
 
   // Audio
   RetroP_SoundDevice           soundDevice;
-  Retro_SoundObject            soundObject[RETRO_MAX_SOUND_OBJECTS];
+  RetroP_SoundObject*           soundObject;
   micromod_sdl_context*        musicContext;
 #ifdef RETRO_BROWSER
 #endif
 
-  // Sprites and Animation
-  RetroP_Animation             animations[RETRO_MAX_ANIMATIONS];
-  RetroP_Sprite                sprites[RETRO_MAX_SPRITES];
-  RetroP_Bitmap                bitmaps[RETRO_MAX_BITMAPS];
-  RetroP_Sound                 sounds[RETRO_MAX_SOUNDS];
 
   // Platform specific
 #ifdef RETRO_BROWSER
@@ -181,18 +180,16 @@ typedef struct
   U8*                          musicFileData;
 #endif
 
-  // Library specific
-#ifdef RETRO_IS_LIBRARY
-  void(*InitFunction)();
-  void(*StartFunction)();
-  void(*StepFunction)();
-#endif
-
 } RetroP_Context;
 
-RetroP_Context*              RCTX;
-RetroP_Animation*            RETROP_ANIMATIONS;
-RetroP_Sprite*               RETROP_SPRITES;
+RetroP_Context*   RCTX = NULL;
+RetroP_Context*   RCTXS[RETRO_MAX_CONTEXT];
+U32               RETRO_CONTEXT_COUNT;
+
+SDL_Window*       RETROP_WINDOW;
+U16               RETROP_WINDOW_WIDTH;
+U16               RETROP_WINDOW_HEIGHT;
+
 
 #define RETRO_SDL_DRAW_PUSH_RGB(T, RGB) \
   SDL_Color T; U8 TAlpha;\
@@ -387,10 +384,10 @@ RetroP_Sprite* Retro_SpriteHandle_GetFree()
 {
   for (U32 i=0;i < RETRO_MAX_SPRITES;i++)
   {
-    if (RETROP_SPRITES[i].spriteHandle == 0xFFFF)
+    if (RCTX->sprites[i].spriteHandle == 0xFFFF)
     {
-      RETROP_SPRITES[i].spriteHandle = i;
-      return &RETROP_SPRITES[i];
+      RCTX->sprites[i].spriteHandle = i;
+      return &RCTX->sprites[i];
     }
   }
   assert(true);
@@ -399,7 +396,7 @@ RetroP_Sprite* Retro_SpriteHandle_GetFree()
 
 RetroP_Sprite* RetroP_SpriteHandle_Get(SpriteHandle handle)
 {
-  return &RETROP_SPRITES[handle];
+  return &RCTX->sprites[handle];
 } 
 
 SpriteHandle Retro_Sprites_LoadSprite(BitmapHandle bitmap, U32 x, U32 y, U32 w, U32 h)
@@ -421,10 +418,10 @@ RetroP_Animation* RetroP_AnimationHandle_GetFree()
 {
   for (U32 i=0;i < RETRO_MAX_ANIMATIONS;i++)
   {
-    if (RETROP_ANIMATIONS[i].animationHandle == 0xFFFF)
+    if (RCTX->animations[i].animationHandle == 0xFFFF)
     {
-      RETROP_ANIMATIONS[i].animationHandle = i;
-      return &RETROP_ANIMATIONS[i];
+      RCTX->animations[i].animationHandle = i;
+      return &RCTX->animations[i];
     }
   }
   assert(true);
@@ -433,7 +430,7 @@ RetroP_Animation* RetroP_AnimationHandle_GetFree()
 
 RetroP_Animation* Retro_AnimationHandle_Get(AnimationHandle handle)
 {
-  return &RETROP_ANIMATIONS[handle];
+  return &RCTX->animations[handle];
 } 
 
 AnimationHandle Retro_Animation_Load(BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight, S32 frameOffsetX, S32 frameOffsetY)
@@ -952,33 +949,43 @@ Rect Rect_Make(S32 x, S32 y, S32 w, S32 h)
   return r;
 }
 
-U8* Arena_Obtain(U32 size)
+U8* RetroP_Arena_ObtainImpl(RetroP_Arena* arena, U32 size)
 {
-  assert(RCTX->arena.current + size < RCTX->arena.end); // Ensure can fit.
-  U8* mem = RCTX->arena.current;
-  RCTX->arena.current += size;
+  assert(arena->current + size < arena->end); // Ensure can fit.
+  U8* mem = arena->current;
+  arena->current += size;
   return mem;
 }
 
-void Arena_RewindPtr(U8* mem)
+#define RetroP_Arena_ObtainImplT(ARENA, T) ((T*) RetroP_Arena_ObtainImpl(ARENA, sizeof(T)))
+#define RetroP_Arena_ObtainImplArrayT(ARENA, N, T) ((T*) RetroP_Arena_ObtainImpl(ARENA, N * sizeof(T)))
+
+U8* RetroP_Arena_Obtain(U32 size)
+{
+  return RetroP_Arena_ObtainImpl(&RCTX->arena, size);
+}
+
+#define RetroP_Arena_ObtainT(T) ((T*) RetroP_Arena_Obtain(sizeof(T)))
+
+void RetroP_Arena_RewindPtr(U8* mem)
 {
   assert(mem >= RCTX->arena.begin);
   assert(mem <= RCTX->arena.current);
   RCTX->arena.current = mem;
 }
 
-void Arena_RewindU32(U32 offset)
+void RetroP_Arena_RewindU32(U32 offset)
 {
   assert(offset < RETRO_ARENA_SIZE);
   RCTX->arena.current = RCTX->arena.begin + offset;
 }
 
-U32 Arena_Current()
+U32 RetroP_Arena_Current()
 {
   return RCTX->arena.current - RCTX->arena.begin;
 }
 
-int  Arena_PctSize()
+int  RetroP_Arena_PctSize()
 {
   U32 used = (RCTX->arena.current - RCTX->arena.begin);
   float pct = ((float) used / (float) RETRO_ARENA_SIZE);
@@ -992,7 +999,7 @@ typedef struct
   U32  scopeStackIndex;
   U32  musicSamples;
   char musicName[32];
-} Retro_ArenaSave;
+} RetroP_ArenaSave;
 
 void Retro_Arena_Save(const char* filename)
 {
@@ -1027,18 +1034,20 @@ U8* Retro_SaveToMem(U8* mem, void* obj, U32 size)
 
 U8* Retro_Arena_SaveToMemory(U32* outSize)
 {
-  U32 memSize = sizeof(Retro_ArenaSave);
+  U32 memSize = sizeof(RetroP_ArenaSave);
   memSize += (RCTX->scopeStackIndex + 1) * sizeof(RetroP_ScopeStack);
-  memSize += Arena_Current();
+  memSize += RetroP_Arena_Current();
 
   *outSize = memSize;
 
-  printf("Size = %i\n", memSize);
-
   U8* mem = (U8*) malloc(memSize);
+  memset(mem, 0, memSize);
+
   U8* p = mem;
 
-  Retro_ArenaSave s;
+  RetroP_ArenaSave s;
+  memset(&s, 0, sizeof(RetroP_ArenaSave));
+
   s.header[0] = 'R';
   s.header[1] = 'E';
   s.header[2] = 'T';
@@ -1052,7 +1061,7 @@ U8* Retro_Arena_SaveToMemory(U32* outSize)
   else
     s.musicSamples = 0;
 
-  p = Retro_SaveToMem(p, &s, sizeof(Retro_ArenaSave));
+  p = Retro_SaveToMem(p, &s, sizeof(RetroP_ArenaSave));
 
   for(U32 i=0;i < (s.scopeStackIndex + 1);i++)
   {
@@ -1075,9 +1084,9 @@ void Retro_Arena_LoadFromMemory(U8* mem, bool loadMusic)
 {
   U8* p = (U8*) mem;
 
-  Retro_ArenaSave l;
+  RetroP_ArenaSave l;
 
-  p = Retro_ReadFromMem(p, &l, sizeof(Retro_ArenaSave));
+  p = Retro_ReadFromMem(p, &l, sizeof(RetroP_ArenaSave));
 
   assert(l.header[0] == 'R');
   assert(l.header[1] == 'E');
@@ -1114,7 +1123,7 @@ void Retro_Scope_Push(int name)
   RetroP_ScopeStack* scope = &RCTX->scopeStack[RCTX->scopeStackIndex];
 
   scope->name = name;
-  scope->p = Arena_Current();
+  scope->p = RetroP_Arena_Current();
 }
 
 int Retro_Scope_Name()
@@ -1127,13 +1136,13 @@ U8* Retro_Scope_Obtain(U32 size)
 {
   RetroP_ScopeStack* scope = &RCTX->scopeStack[RCTX->scopeStackIndex];
   assert(scope->p + size < RETRO_ARENA_SIZE); // Ensure can fit.
-  return Arena_Obtain(size);
+  return RetroP_Arena_Obtain(size);
 }
 
 void Retro_Scope_Rewind()
 {
   RetroP_ScopeStack* scope = &RCTX->scopeStack[RCTX->scopeStackIndex];
-  Arena_RewindU32(scope->p);
+  RetroP_Arena_RewindU32(scope->p);
 }
 
 void Retro_Scope_Pop()
@@ -1379,7 +1388,7 @@ void  Retro_Debug(Font* font)
   U32 soundObjectCount = 0;
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
-    Retro_SoundObject* soundObj = &RCTX->soundObject[i];
+    RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
 
     if (soundObj->sound != NULL)
       soundObjectCount++;
@@ -1392,7 +1401,7 @@ void  Retro_Debug(Font* font)
     music = (int) 100 - (((float) RCTX->musicContext->samples_remaining / (float) RCTX->musicContext->length) *100.0f);
   }
 
-  Retro_Canvas_Printf(0, RCTX->settings.canvasHeight - font->height, font, RCTX->palette.fallback, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], Arena_PctSize(), RCTX->fps, RCTX->deltaTime, soundObjectCount, music);
+  Retro_Canvas_Printf(0, RCTX->settings.canvasHeight - font->height, font, RCTX->palette.fallback, "Scope=%c%c%c%c Mem=%i%% FPS=%.2g Dt=%i Snd=%i, Mus=%i", f.b[3], f.b[2], f.b[1], f.b[0], RetroP_Arena_PctSize(), RCTX->fps, RCTX->deltaTime, soundObjectCount, music);
 }
 
 RetroP_Sound* RetroP_Sound_GetFree()
@@ -1460,7 +1469,7 @@ void  Retro_Audio_PlaySound(SoundHandle soundHandle, U8 volume)
 
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
-    Retro_SoundObject* soundObj = &RCTX->soundObject[i];
+    RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
     if (soundObj->sound != NULL)
      continue;
 
@@ -1476,7 +1485,7 @@ void  Retro_Audio_ClearSounds()
 {
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
-    Retro_SoundObject* soundObj = &RCTX->soundObject[i];
+    RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
 
     soundObj->sound = NULL;
     soundObj->p = 0;
@@ -1579,7 +1588,7 @@ void Retro_SDL_SoundCallback(void* userdata, U8* stream, int streamLength)
 
   for(U32 i=0;i < RETRO_MAX_SOUND_OBJECTS;i++)
   {
-    Retro_SoundObject* soundObj = &RCTX->soundObject[i];
+    RetroP_SoundObject* soundObj = &RCTX->soundObject[i];
 
     if (soundObj->sound == NULL)
       continue;
@@ -2262,9 +2271,12 @@ void InitialiseRetro(const char* caption, U32 width, U32 height)
   
   isSetup = true;
 
+  RETRO_CONTEXT_COUNT = 0;
+  RCTX = NULL;
+
   SDL_Init(SDL_INIT_EVERYTHING);
 
-  sdlWindow = SDL_CreateWindow( 
+  RETROP_WINDOW = SDL_CreateWindow( 
     caption,
     SDL_WINDOWPOS_UNDEFINED, 
     SDL_WINDOWPOS_UNDEFINED,
@@ -2272,6 +2284,9 @@ void InitialiseRetro(const char* caption, U32 width, U32 height)
     height,
     SDL_WINDOW_SHOWN
   );
+
+  gFmtScratch = malloc(1024);
+
 }
 
 void RetroLoop()
@@ -2300,73 +2315,92 @@ void ShutdownRetro()
   SDL_Quit();
 }
 
-void InitContext(Retro_Initialiser* initialiser, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
+static RetroP_Context* AllocateContextAndArenaBytes(Retro_Initialiser* settings)
 {
+  // This is essentially one massive allocation, containing the Context and Resources and the Arena at the end.
+  U32 nbBytes = 0;
+  nbBytes += sizeof(RetroP_Context);
+  nbBytes += settings->maxBitmaps      * sizeof(RetroP_Bitmap);
+  nbBytes += settings->maxSounds       * sizeof(RetroP_Sound);
+  nbBytes += settings->maxSprites      * sizeof(RetroP_Sprite);
+  nbBytes += settings->maxAnimations   * sizeof(RetroP_Animation);
+  nbBytes += settings->canvasCount     * sizeof(RetroP_Canvas);
+  nbBytes += settings->maxInputActions * sizeof(RetroP_InputActionBinding);
+  nbBytes += settings->maxSoundObjects * sizeof(RetroP_SoundObject);
+  nbBytes += settings->arenaSize;
 
-  RCTX = (RetroP_Context*) malloc(sizeof(RetroP_Context));
-  memset(RCTX, 0, sizeof(RetroP_Context));
-  memcpy(&RCTX->settings, initialiser, sizeof(Retro_Initialiser));
+  printf("[Retro] Allocating %i bytes, of %i is ROM and %i is RAM\n", nbBytes, nbBytes - settings->arenaSize, settings->arenaSize);
 
-#if RETRO_IS_LIBRARY
-  RCTX->InitFunction  = InitFunction;
-  RCTX->StartFunction = StartFunction;
-  RCTX->StepFunction  = StepFunction;
-#endif
+  U8* mem = malloc(nbBytes);
+  memset(mem, 0, nbBytes);
 
-  RCTX->arena.begin = malloc(initialiser->arenaSize);
-  RCTX->arena.current = RCTX->arena.begin;
-  RCTX->arena.end = RCTX->arena.begin + initialiser->arenaSize;
+  RetroP_Context* context = (RetroP_Context*) mem;
 
-  RETROP_ANIMATIONS = &RCTX->animations[0];
-  RETROP_SPRITES    = &RCTX->sprites[0];
+  context->mem.begin   = mem;
+  context->mem.current = mem + sizeof(RetroP_Context);
+  context->mem.end     = mem + nbBytes;
 
-  memset(RCTX->arena.begin, 0, initialiser->arenaSize);
+  context->arena.begin   = mem + nbBytes - settings->arenaSize;
+  context->arena.current = context->arena.begin;
+  context->arena.end     = context->arena.begin + settings->arenaSize;
 
-  RCTX->canvas = malloc(sizeof(RetroP_Canvas) * initialiser->canvasCount);
+  return context;
+}
 
+static void InitContext(Retro_Initialiser* settings, void(*InitFunction)(), void(*StartFunction)(), void(*StepFunction)())
+{
+  // Allocate memory, and arena. 
+  RCTX = AllocateContextAndArenaBytes(settings);
+  memcpy(&RCTX->settings, settings, sizeof(Retro_Initialiser));
 
-  gFmtScratch = malloc(1024);
+  
+  // Copy in context functions
+  RCTX->initFunction  = InitFunction;
+  RCTX->startFunction = StartFunction;
+  RCTX->stepFunction  = StepFunction;
+  
 
-  memset(RCTX->inputActions, 0, sizeof(RCTX->inputActions));
+  // Loaded Resources
+  RCTX->bitmaps       = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxBitmaps,    RetroP_Bitmap);
+  for(U32 i=0;i < settings->maxBitmaps;i++)
+    RCTX->bitmaps[i].bitmapHandle = 0xFFFF;
 
-  for(int i=0;i < initialiser->maxInputActions;i++)
+  RCTX->sounds        = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxSounds,     RetroP_Sound);
+  for(U32 i=0;i < settings->maxSounds;i++)
+    RCTX->sounds[i].soundHandle = 0xFFFF;
+
+  RCTX->sprites       = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxSprites,    RetroP_Sprite);
+  for(U32 i=0;i < settings->maxSprites;i++)
+    RCTX->sprites[i].spriteHandle = 0xFFFF;
+
+  RCTX->animations    = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxAnimations, RetroP_Animation);
+  for(U32 i=0;i < settings->maxAnimations;i++)
+    RCTX->animations[i].animationHandle = 0xFFFF;
+  
+
+  // Canvas
+  RCTX->canvas        = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->canvasCount,   RetroP_Canvas);
+  
+
+  // Input
+  RCTX->inputActions  = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxInputActions, RetroP_InputActionBinding);
+
+  for(int i=0;i < settings->maxInputActions;i++)
   {
     RCTX->inputActions[i].action = 0xDEADBEEF;
   }
 
-  RCTX->settings.windowWidth =  initialiser->windowWidth;
-  RCTX->settings.windowHeight = initialiser->windowHeight;
-  RCTX->settings.canvasWidth  = initialiser->canvasWidth;
-  RCTX->settings.canvasHeight = initialiser->canvasHeight;
-
-  memset(RETROP_ANIMATIONS, 0, initialiser->maxAnimations * sizeof(RetroP_Animation));
-  memset(RETROP_SPRITES, 0, initialiser->maxSprites * sizeof(RetroP_Sprite));
-
-  for(U32 i=0;i < initialiser->maxAnimations;i++)
-    RETROP_ANIMATIONS[i].animationHandle = 0xFFFF;
-
-  for(U32 i=0;i < initialiser->maxSprites;i++)
-    RETROP_SPRITES[i].spriteHandle = 0xFFFF;
-
-  for(U32 i=0;i < initialiser->maxBitmaps;i++)
-    RCTX->bitmaps[i].bitmapHandle = 0xFFFF;
-
-  for(U32 i=0;i < initialiser->maxSounds;i++)
-    RCTX->sounds[i].soundHandle = 0xFFFF;
-
-  memset(&RCTX->soundObject, 0, sizeof(RCTX->soundObject));
-  memset(&RCTX->soundDevice, 0, sizeof(RetroP_SoundDevice));
-
-  RCTX->musicContext = NULL;
+  // Sound
+  RCTX->soundObject  = RetroP_Arena_ObtainImplArrayT(&RCTX->mem, settings->maxSoundObjects, RetroP_SoundObject);
 
   SDL_AudioSpec want, got;
   memset(&want, 0, sizeof(want));
   memset(&got, 0, sizeof(got));
 
-  want.freq     = initialiser->audioFrequency;
+  want.freq     = settings->audioFrequency;
   want.format   = AUDIO_S16;
-  want.channels = initialiser->audioChannels;
-  want.samples  = initialiser->audioSamples;
+  want.channels = settings->audioChannels;
+  want.samples  = settings->audioSamples;
   want.callback = Retro_SDL_SoundCallback;
   want.userdata = NULL;
 
@@ -2386,14 +2420,14 @@ void InitContext(Retro_Initialiser* initialiser, void(*InitFunction)(), void(*St
   RCTX->musicFileData = NULL;
 #endif
 
-  RCTX->renderer = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
+  RCTX->renderer = SDL_CreateRenderer(RETROP_WINDOW, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
   RCTX->framePresentation = FP_Normal;
   RCTX->frameAlpha = 0.78f;
   RCTX->frameBeta = 0.78f;
 
   Retro_Palette_MakeImpl(&RCTX->palette);
 
-  if (initialiser->defaultPalette == 'DB16' || initialiser->defaultPalette == 'db16')
+  if (settings->defaultPalette == 'DB16' || settings->defaultPalette == 'db16')
   {
     Retro_Palette_Add2(0x14, 0x0c, 0x1c ); // black
     Retro_Palette_Add2(0x44, 0x24, 0x34 ); // darkRed
@@ -2417,14 +2451,14 @@ void InitContext(Retro_Initialiser* initialiser, void(*InitFunction)(), void(*St
     RCTX->palette.transparent = 16;
   }
 
-  for (U8 i=0;i < initialiser->canvasCount;i++)
+  for (U8 i=0;i < settings->canvasCount;i++)
   {
     RCTX->canvas[i].texture = SDL_CreateTexture(
       RCTX->renderer,
       SDL_PIXELFORMAT_ABGR8888,
       SDL_TEXTUREACCESS_TARGET,
-      initialiser->canvasWidth, 
-      initialiser->canvasHeight);
+      settings->canvasWidth, 
+      settings->canvasHeight);
 
     int flags = CNF_Clear | CNF_Render;
     if (i > 0)
