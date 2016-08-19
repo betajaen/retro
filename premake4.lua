@@ -27,7 +27,7 @@ solution "Retro"
           includedirs     { "ref/SDL2/include", "ref/" }
           libdirs         { "ref/SDL2/lib/x86/" }
           
-          files           { "retro.c", "retro.h", "ref/*.c", "ref/*.h" }
+          files           { "retro.c", "retro*.h", "ref/*.c", "ref/*.h" }
           excludes        { "ref/*.c", "ref/*.h" }
 
       --------------------------------------------------------------------------
@@ -37,12 +37,12 @@ solution "Retro"
           language        "C"
           objdir          "_build"
           flags           { "FatalWarnings", "NoExceptions", "NoRTTI" }
-          defines         { "RETRO_USING_RETRO_AS_LIBRARY" }
+          defines         { "RETRO_USING_AS_LIBRARY" }
           links           { "LibRetro" }
           includedirs     { }
           libdirs         { }
           
-          files           { "retro.h", "main.c", "resources.rc", "resources.rc", "assets/*.png", "assets/*.wav", "assets/*.mod" }
+          files           { "retro*.h", "main.c", "resources.rc", "resources.rc", "assets/*.png", "assets/*.wav", "assets/*.mod" }
           excludes        { }
 
       --------------------------------------------------------------------------
@@ -57,7 +57,7 @@ solution "Retro"
           includedirs     { }
           libdirs         { }
           
-          files           { "retro.h", "editor/*.c", "editor/*.h", "editor/editor_resources.rc", "editor/assets/*.png", "editor/assets/*.wav", "editor/assets/*.mod" }
+          files           { "retro*.h", "editor/*.c", "editor/*.h", "editor/editor_resources.rc", "editor/assets/*.png", "editor/assets/*.wav", "editor/assets/*.mod" }
           excludes        { "editor/editor_main.c" }
 
       --------------------------------------------------------------------------
@@ -68,11 +68,11 @@ solution "Retro"
           objdir          "_build"
           flags           { "FatalWarnings", "NoExceptions", "NoRTTI", "WinMain" }
           defines         { "RETRO_USING_AS_LIBRARY" }
-          links           { "LibRetro" }
+          links           { "LibRetro", "LibEditor" }
           includedirs     { }
           libdirs         { }
           
-          files           { "retro.h", "editor/editor_main.c" }
+          files           { "retro*.h", "editor/editor_main.c" }
           excludes        { }
 
       --------------------------------------------------------------------------
@@ -87,7 +87,7 @@ solution "Retro"
           includedirs     { "ref/SDL2/include", "ref/" }
           libdirs         { "ref/SDL2/lib/x86/" }
           
-          files           { "retro.c", "retro.h", "*.c", "*.h", "ref/*.c", "ref/*.h", "resources.rc", "resources.rc", "assets/*.png", "assets/*.wav", "assets/*.mod" }
+          files           { "retro.c", "retro*.h", "*.c", "*.h", "ref/*.c", "ref/*.h", "resources.rc", "resources.rc", "assets/*.png", "assets/*.wav", "assets/*.mod" }
           excludes        { "retro.c", "ref/*.c", "ref/*.h" }
 
       --------------------------------------------------------------------------

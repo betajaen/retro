@@ -1,14 +1,20 @@
 #define RETRO_DEFAULT_WINDOW_CAPTION "Retro Game"
-#define RETRO_DEFAULT_CANVAS_COUNT 2
 
+#if !defined(RETRO_USING_AS_LIBRARY)
 #include "retro.c"
+#else
+#include "retro.h"
+#endif
 
-static Font                 FONT_NEOSANS;
-static BitmapHandle         SPRITESHEET;
-static AnimationHandle      ANIMATEDSPRITE_QUOTE_IDLE;
-static AnimationHandle      ANIMATEDSPRITE_QUOTE_WALK;
-static SoundHandle          SOUND_COIN;
-static Timer                TIMER;
+#include "retro_ns.h"
+#include "retro_sh.h"
+
+static Retro_Font                 FONT_NEOSANS;
+static Retro_BitmapHandle         SPRITESHEET;
+static Retro_AnimationHandle      ANIMATEDSPRITE_QUOTE_IDLE;
+static Retro_AnimationHandle      ANIMATEDSPRITE_QUOTE_WALK;
+static Retro_SoundHandle          SOUND_COIN;
+static Retro_Timer                TIMER;
 
 typedef enum 
 {
@@ -33,34 +39,34 @@ typedef enum
 
 typedef struct
 {
-  AnimationObject player;
-  Point velocity;
+  Retro_AnimationObject player;
+  Retro_Point velocity;
 } GameState;
 
 GameState* state;
 
-void Init()
+RETRO_USER_INIT_API void Init()
 {
   SPRITESHEET = resources.loadBitmap("cave.png", 0);
   SOUND_COIN  = resources.loadSound("coin.wav");
-  resources.loadFont("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
+  resources.loadFont("NeoSans.png", &FONT_NEOSANS, Retro_Colour_Make(0,0,255), Retro_Colour_Make(255,0,255));
 
-  input.bindKey(SDL_SCANCODE_W, AC_UP);
-  input.bindKey(SDL_SCANCODE_D, AC_RIGHT);
-  input.bindKey(SDL_SCANCODE_S, AC_DOWN);
-  input.bindKey(SDL_SCANCODE_A, AC_LEFT);
-  input.bindKey(SDL_SCANCODE_RETURN, AC_ACTION);
-  input.bindKey(SDL_SCANCODE_ESCAPE, AC_CANCEL);
-  input.bindKey(SDL_SCANCODE_1, AC_MUSIC_ON);
-  input.bindKey(SDL_SCANCODE_2, AC_MUSIC_OFF);
-  input.bindKey(SDL_SCANCODE_5, AC_ARENA_SAVE);
-  input.bindKey(SDL_SCANCODE_6, AC_ARENA_LOAD);
+  input.bindKey(RETRO_KEY_W, AC_UP);
+  input.bindKey(RETRO_KEY_D, AC_RIGHT);
+  input.bindKey(RETRO_KEY_S, AC_DOWN);
+  input.bindKey(RETRO_KEY_A, AC_LEFT);
+  input.bindKey(RETRO_KEY_RETURN, AC_ACTION);
+  input.bindKey(RETRO_KEY_ESCAPE, AC_CANCEL);
+  input.bindKey(RETRO_KEY_1, AC_MUSIC_ON);
+  input.bindKey(RETRO_KEY_2, AC_MUSIC_OFF);
+  input.bindKey(RETRO_KEY_5, AC_ARENA_SAVE);
+  input.bindKey(RETRO_KEY_6, AC_ARENA_LOAD);
 
   ANIMATEDSPRITE_QUOTE_IDLE = sprites.loadAnimationH(SPRITESHEET, 1, 100, 0, 80, 16, 16);
   ANIMATEDSPRITE_QUOTE_WALK = sprites.loadAnimationH(SPRITESHEET, 4, 120, 0, 80, 16, 16);
 }
 
-void Start()
+RETRO_USER_START_API void Start()
 {
   state = Retro_Scope_New(GameState);
 
@@ -76,10 +82,13 @@ void Start()
   audio.playMusic("origin.mod");
 
   //Retro_StartFromLibrary("LibGame.dll", LF_AsCopy);
+
+  canvas.flags(0, CNF_Clear | CNF_Render, palette.black);
 }
 
-void Step()
+RETRO_USER_STEP_API void Step()
 {
+
 
   if (input.released(AC_ACTION))
   {
@@ -161,16 +170,18 @@ void Step()
     }
   }
 
-  canvas.use(0);
-  state->player.x -= 10;
+  //canvas.use(0);
+  //state->player.x -= 10;
   canvas.animate(&state->player, true);
-  state->player.x += 10;
+  //state->player.x += 10;
   
-  canvas.use(1);
-  canvas.animate(&state->player, true);
+  //canvas.use(1);
+  //canvas.animate(&state->player, true);
   
   U32 ms = timer.ticks(&TIMER);
   canvas.printf(10, 10, &FONT_NEOSANS, palette.peach, "%i", ms);
 
   Retro_Debug(&FONT_NEOSANS);
+
+
 }

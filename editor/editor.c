@@ -3,6 +3,8 @@
 #define RETRO_NO_MAIN
 
 #include "../retro.h"
+#include "../retro_ns.h"
+#include "../retro_sh.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -52,9 +54,24 @@ bool Editor_Button(S32 x, S32 y, const char* str)
   return true;
 }
 
+
+
+RETRO_USER_SETTINGS_API void Settings(Retro_Settings* settings)
+{
+  settings->windowWidth   = 1280;
+  settings->windowHeight  = 720;
+  settings->canvasWidth   = settings->windowWidth / 2;
+  settings->canvasHeight  = settings->windowHeight;
+  settings->canvasScaleX  = 1;
+  settings->canvasScaleY  = 1;
+  settings->canvasX       = 0;
+}
+
 RETRO_USER_INIT_API void Init()
 {
   Editor_SetPalette();
+
+  input.bindKey(RETRO_KEY_0, 1);
 }
 
 RETRO_USER_START_API void Start()
@@ -69,20 +86,15 @@ RETRO_USER_STEP_API void Step()
   Editor_Button(1 + UI_LastRight, rand() % 5, "Play");
   Editor_Button(1 + UI_LastRight, rand() % 5, "Pause");
   Editor_Button(1 + UI_LastRight, rand() % 5, "Stop");
-}
 
-#if 1
-int main(int argc, char *argv[])
-{
-  Retro_Settings initialiser = Retro_Default_Settings;
-  initialiser.windowWidth   = 1280;
-  initialiser.windowHeight  = 720;
-  initialiser.canvasWidth   = initialiser.windowWidth / 2;
-  initialiser.canvasHeight  = initialiser.windowHeight;
-  initialiser.viewport      = Rect_Make(1280 / 2, 0, 1280 / 2, 720);
+  if (input.released(1))
+  {
+    if (Retro_Context_Count() == 1)
+    {
+      Retro_Context_LoadFromLibrary("LibGame", 0);
+    }
+  }
 
-  Retro_Start(&initialiser, Init, Start, Step);
-  Retro_Shutdown();
-  return 0;
+
+  Retro_Debug(&FONT_UI);
 }
-#endif
