@@ -98,10 +98,6 @@
 #define RETRO_DEFAULT_AUDIO_SAMPLES 16384
 #endif 
 
-#ifndef RETRO_NAMESPACES
-#define RETRO_NAMESPACES 1
-#endif
-
 #ifndef RETRO_DEFAULT_PALETTE
 #define RETRO_DEFAULT_PALETTE 'DB16'
 #endif
@@ -961,14 +957,14 @@ RETRO_API void  Retro_Context_Enable(int name);
 // Disable a context from 'Step'
 RETRO_API void  Retro_Context_Disable(int name);
 
-// Unload a context from memory (if a library also unload that library)
-RETRO_API void  Retro_Context_Unload(int name);
-
 // Load a context internally from the current runtime. Most common method
 RETRO_API int   Retro_Context_LoadFromInternal(Retro_Settings* settings, void(*initFunction)(), void(*startFunction)(), void(*stepFunction)(), U8 contextFlags);
 
 // Load a context externally i.e. from a library.  Least common method - Used with the editor, for edit-and-play
 RETRO_API int   Retro_Context_LoadFromLibrary(const char* libraryPath, U8 contextFlags);
+
+// Unload a context from memory (if a library also unload that library)
+RETRO_API bool  Retro_Context_Unload(int name);
 
 // Completely shutdown Retro and SDL.
 RETRO_API void Retro_Shutdown();
@@ -1010,3 +1006,340 @@ RETRO_API void Retro_Shutdown();
 
 
 #endif  // RETRO_H
+
+
+#if defined(RETRO_SHORTHAND)
+
+typedef Retro_SpriteHandle           SpriteHandle;
+typedef Retro_AnimationHandle        AnimationHandle;
+typedef Retro_BitmapHandle           BitmapHandle;
+typedef Retro_SoundHandle            SoundHandle;
+typedef Retro_Rect                   Rect;
+typedef Retro_Colour                 Colour;
+typedef Retro_Palette                Palette;
+typedef Retro_Font                   Font;
+typedef Retro_Timer                  Timer;
+typedef Retro_SpriteObjectFlags      SpriteObjectFlags;
+typedef Retro_SpriteObject           SpriteObject;
+typedef Retro_AnimationObject        AnimationObject;
+
+#define   Hex_Char             Retro_Hex_Char             
+#define   Hex_U8               Retro_Hex_U8
+#define   Hex_S8               Retro_Hex_S8
+#define   Hex_U16              Retro_Hex_U16
+#define   Hex_S16              Retro_Hex_S16
+#define   Hex_U32              Retro_Hex_U32
+#define   Hex_S32              Retro_Hex_S32
+#define   Hex_Colour           Retro_Hex_Colour
+#define   Colour_Make          Retro_Colour_Make
+#define   Point_Make           Retro_Point_Make
+#define   Size_Make            Retro_Size_Make
+#define   Rect_Make            Retro_Rect_Make
+
+#   define Arena_LoadFromMemory       Retro_Arena_LoadFromMemory
+#   define Arena_Load                 Retro_Arena_Load
+#   define Arena_SaveToMemory         Retro_Arena_SaveToMemory
+#   define Arena_Save                 Retro_Arena_Save
+
+#   define Scope_Push              Retro_Scope_Push
+#   define Scope_Name              Retro_Scope_Name
+#   define Scope_Obtain            Retro_Scope_Obtain
+#   define Scope_Rewind            Retro_Scope_Rewind
+#   define Scope_Pop               Retro_Scope_Pop
+
+#  define  Resources_LoadPalette      Retro_Resources_LoadPalette
+#  define  Resources_LoadBitmap       Retro_Resources_LoadBitmap
+#  define  Resources_LoadSound        Retro_Resources_LoadSound
+#  define  Resources_Font_Load        Retro_Resources_LoadFont
+
+
+#   define Sprites_LoadSprite              Retro_Sprites_LoadSprite
+#   define Sprites_LoadAnimationH          Retro_Sprites_LoadAnimationH
+#   define Sprites_LoadAnimationV          Retro_Sprites_LoadAnimationV
+#   define Sprites_MakeAnimationObject     Retro_Sprites_MakeAnimationObject
+#   define Sprites_PlayAnimationObject     Retro_Sprites_PlayAnimationObject
+#   define Sprites_SetAnimationObject      Retro_Sprites_SetAnimationObject
+
+
+
+#   define Canvas_Width                                    Retro_Canvas_Width
+#   define Canvas_Height                                   Retro_Canvas_Height
+#   define Canvas_Use                                      Retro_Canvas_Use
+#   define Canvas_Flags                                    Retro_Canvas_Flags
+#   define Canvas_Clear                                    Retro_Canvas_Clear
+#   define Canvas_Copy                                     Retro_Canvas_Copy
+#   define Canvas_Copy2                                    Retro_Canvas_Copy2
+#   define Canvas_Sprite                                   Retro_Canvas_Sprite
+#   define Canvas_Sprite2                                  Retro_Canvas_DrawSprite
+#   define Canvas_Animate                                  Retro_Canvas_Animate
+#   define Canvas_Animate2                                 Retro_Canvas_DrawAnimation
+#   define Canvas_DrawBox                                  Retro_Canvas_DrawBox
+#   define Canvas_DrawRectangle                            Retro_Canvas_DrawRectangle
+#   define Canvas_DrawPalette                              Retro_Canvas_DrawPalette
+#   define Canvas_DrawPalette2                             Retro_Canvas_DrawPalette2
+#   define Canvas_Print                                    Retro_Canvas_Print
+#   define Canvas_Printf                                   Retro_Canvas_Printf
+#   define Canvas_MonoPrint                                Retro_Canvas_MonoPrint
+
+
+#   define    Audio_PlaySound              Retro_Audio_PlaySound
+#   define    Audio_ClearSounds            Retro_Audio_ClearSounds
+#   define    Audio_PlayMusic              Retro_Audio_PlayMusic
+#   define    Audio_StopMusic              Retro_Audio_StopMusic
+
+
+#   define  Palette_Add            Retro_Palette_Add
+#   define  Palette_Add2           Retro_Palette_Add2
+#   define  Palette_AddRGB         Retro_Palette_AddARGB
+#   define  Palette_Index          Retro_Palette_Index
+#   define  Palette_Has            Retro_Palette_Has
+#   define  Palette_Get            Retro_Palette_Get
+
+
+#   define Input_TextInput           Retro_Input_TextInput
+#   define Input_BindKey             Retro_Input_BindKey
+#   define Input_BindAxis            Retro_Input_BindAxis
+#   define Input_Down                Retro_Input_Down
+#   define Input_Released            Retro_Input_Released
+#   define Input_Pressed             Retro_Input_Pressed
+#   define Input_NowAxis             Retro_Input_NowAxis
+#   define Input_DeltaAxis           Retro_Input_DeltaAxis
+
+#if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
+#   define Colour_black 0 
+#   define Colour_darkRed 1 
+#   define Colour_darkBlue 2 
+#   define Colour_darkGray 3 
+#   define Colour_brown 4 
+#   define Colour_darkGreen 5 
+#   define Colour_red 6 
+#   define Colour_lightGray 7 
+#   define Colour_lightBlue 8 
+#   define Colour_orange 9 
+#   define Colour_blueGray 10 
+#   define Colour_lightGreen 11 
+#   define Colour_peach 12 
+#   define Colour_cyan 13 
+#   define Colour_yellow 14 
+#   define Colour_white 15 
+#   define Colour_transparent 16 
+#endif
+
+
+
+#   define Timer_Make(TIMER)      Retro_TimerMake(TIMER)
+#   define Timer_Start(TIMER)     Retro_Timer_Start(TIMER)
+#   define Timer_Stop(TIMER)      Retro_Timer_Stop(TIMER)
+#   define Timer_Pause(TIMER)     Retro_Timer_Pause(TIMER)
+#   define Timer_Unpause(TIMER)   Retro_Timer_Unpause(TIMER)
+#   define Timer_Ticks(TIMER)     Retro_Timer_Ticks(TIMER)
+#   define Timer_Started(TIMER)   Retro_Timer_Started(TIMER)
+#   define Timer_Paused(TIMER)    Retro_Timer_Paused(TIMER)
+
+#   define _RGB(STR)           Hex_Colour(STR)
+#   define _POINT(X, Y)        Point_Make(X, Y)
+#   define _RECT(X, Y, W, H)   Rect_Make(X, Y, W, H)
+#   define _SIZE(W, H)         Size_Make(W, H)
+#   define _KILOBYTES(BYTES)   RETRO_KILOBYTES(BYTES)
+#   define _MEGABYTES(BYTES)   RETRO_MEGABYTES(BYTES)
+
+
+#endif
+
+
+
+#if defined(RETRO_NAMESPACES)
+
+const struct
+{
+  void (*loadFromMemory)(U8* mem, bool loadMusic);
+  void (*load)(const char* filename, bool loadMusic);
+  U8*  (*saveToMemory)(U32* outSize);
+  void (*save)(const char* filename);
+} arena = {
+  Retro_Arena_LoadFromMemory,
+  Retro_Arena_Load,
+  Retro_Arena_SaveToMemory,
+  Retro_Arena_Save
+};
+
+const struct
+{
+  void (*push)(int name);
+  void (*pop)();
+  int (*name)();
+  U8* (*obtain)(U32 size);
+  void (*rewind)();
+} scope = {
+  Retro_Scope_Push,
+  Retro_Scope_Pop,
+  Retro_Scope_Name,
+  Retro_Scope_Obtain,
+  Retro_Scope_Rewind
+};
+
+const struct
+{
+  void         (*loadPalette)(const char* name);
+  Retro_BitmapHandle (*loadBitmap)(const char* name, U8 transparentIndex);
+  Retro_SoundHandle  (*loadSound)(const char* name);
+  void         (*loadFont)(const char* name, Retro_Font* inFont, Retro_Colour markerColour, Retro_Colour transparentColour);
+  void         (*loadFontFixed)(const char* name, Retro_Font* inFont, U8 w, Retro_Colour transparentColour);
+} resources = {
+  Retro_Resources_LoadPalette,
+  Retro_Resources_LoadBitmap,
+  Retro_Resources_LoadSound,
+  Retro_Resources_LoadFont,
+  Retro_Resources_LoadFontFixed
+};
+
+const struct
+{
+  Retro_SpriteHandle (*loadSprite)(Retro_BitmapHandle bitmap, U32 x, U32 y, U32 w, U32 h);
+  Retro_AnimationHandle (*loadAnimationH)(Retro_BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+  Retro_AnimationHandle (*loadAnimationV)(Retro_BitmapHandle bitmap, U8 numFrames, U8 frameLengthMilliseconds, U32 originX, U32 originY, U32 frameWidth, U32 frameHeight);
+  void (*newAnimation)(Retro_AnimationObject* inAnimatedSpriteObject, Retro_AnimationHandle animation, S32 x, S32 y);
+  void (*playAnimation)(Retro_AnimationObject* animatedSpriteObject, bool playing, bool loop);
+  void (*setAnimation)(Retro_AnimationObject* animatedSpriteObject, Retro_AnimationHandle newAnimation, bool animate);
+} sprites = {
+  Retro_Sprites_LoadSprite,
+  Retro_Sprites_LoadAnimationH,
+  Retro_Sprites_LoadAnimationV,
+  Retro_Sprites_NewAnimationObject,
+  Retro_Sprites_PlayAnimationObject,
+  Retro_Sprites_SetAnimationObject
+};
+
+
+const struct 
+{
+  S32  (*width)();
+  S32  (*height)();
+  void (*use)(U8 canvasIndex);
+  void (*flags)(U8 id, U8 flags, U8 clearColour);
+  void (*clear)();
+  void (*copy)(Retro_BitmapHandle bitmap, Retro_Rect* dstRectangle, Retro_Rect* srcRectangle, U8 copyFlags);
+  void (*copy2)(Retro_BitmapHandle bitmap, S32 dstX, S32 dstY, S32 srcX, S32 srcY, S32 w, S32 h, U8 copyFlags);
+  void (*sprite)(Retro_SpriteObject* spriteObject);
+  void (*animate)(Retro_AnimationObject* animationObject, bool updateTiming);
+  void (*drawPalette)(S32 y);
+  void (*drawPalette2)(S32 y, U8 from, U8 to);
+  void (*drawBox)(U8 colour, Retro_Rect rect);
+  void (*drawRectangle)(U8 colour, Retro_Rect rect);
+  void (*drawSprite)(Retro_SpriteHandle sprite, S32 x, S32 y, U8 flipFlags);
+  void (*drawAnimation)(Retro_AnimationHandle animationHandle, S32 x, S32 y, U8 frame, U8 copyFlags);
+  void (*print)(S32 x, S32 y, Retro_Font* font, U8 colour, const char* str);
+  void (*printf)(S32 x, S32 y, Retro_Font* font, U8 colour, const char* fmt, ...);
+  void (*monoPrint)(S32 x, S32 y, S32 w, Retro_Font* font, U8 colour, const char* str);
+} canvas
+= {
+  Retro_Canvas_Width,
+  Retro_Canvas_Height,
+  Retro_Canvas_Use,
+  Retro_Canvas_Flags,
+  Retro_Canvas_Clear,
+  Retro_Canvas_Copy,
+  Retro_Canvas_Copy2,
+  Retro_Canvas_Sprite,
+  Retro_Canvas_Animate,
+  Retro_Canvas_DrawPalette,
+  Retro_Canvas_DrawPalette2,
+  Retro_Canvas_DrawBox,
+  Retro_Canvas_DrawRectangle,
+  Retro_Canvas_DrawSprite,
+  Retro_Canvas_DrawAnimation,
+  Retro_Canvas_Print,
+  Retro_Canvas_Printf,
+  Retro_Canvas_MonoPrint
+};
+
+const struct
+{
+  void (*playSound)(Retro_SoundHandle sound, U8 volume);
+  void (*clearSounds)();
+  void (*playMusic)(const char* name);
+  void (*stopMusic)();
+} audio = {
+  Retro_Audio_PlaySound,
+  Retro_Audio_ClearSounds,
+  Retro_Audio_PlayMusic,
+  Retro_Audio_StopMusic
+};
+
+
+const struct
+{
+  void   (*add)(Retro_Colour colour);
+  void   (*addRGB)(U8 r, U8 g, U8 b);
+  U8     (*index)(Retro_Colour colour);
+  bool   (*has)(Retro_Colour colour);
+  Retro_Colour (*get)(U8 index);
+  void   (*set)(U8 index, Retro_Colour colour);
+  void   (*setRGB)(U8 index, U8 r, U8 g, U8 b);
+#if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
+  U8  black, darkRed, darkBlue, darkGray, brown, darkGreen, red, lightGray, 
+      lightBlue, orange, blueGray, lightGreen, peach, cyan, yellow, white,
+      transparent;
+#endif
+} palette = {
+  Retro_Palette_Add,
+  Retro_Palette_AddRGB,
+  Retro_Palette_Index,
+  Retro_Palette_Has,
+  Retro_Palette_Get,
+  Retro_Palette_Set,
+  Retro_Palette_SetRGB
+#if (RETRO_DEFAULT_PALETTE == 'DB16' || RETRO_DEFAULT_PALETTE == 'db16')
+  ,  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+#endif
+};
+
+
+const struct
+{
+  int(*textInput)(char* str, U32 capacity);
+  void(*bindKey)(int retroKey, int action);
+  void(*bindAxis)(int axis, int action);
+  bool(*down)(int action);
+  bool(*released)(int action);
+  bool(*pressed)(int action);
+  S16(*axis)(int action);
+  S16(*deltaAxis)(int action);
+} input = {
+  Retro_Input_TextInput,
+  Retro_Input_BindKey,
+  Retro_Input_BindAxis,
+  Retro_Input_Down,
+  Retro_Input_Released,
+  Retro_Input_Pressed,
+  Retro_Input_Axis,
+  Retro_Input_DeltaAxis
+};
+
+
+
+
+const struct
+{
+  void (*make)(Retro_Timer* timer);
+  void (*start)(Retro_Timer* timer);
+  void (*stop)(Retro_Timer* timer);
+  void (*pause)(Retro_Timer* timer);
+  void (*unpause)(Retro_Timer* timer);
+  U32  (*ticks)(Retro_Timer* timer);
+  bool (*started)(Retro_Timer* timer);
+  bool (*paused)(Retro_Timer* timer);
+} timer = {
+  Retro_Timer_Make,
+  Retro_Timer_Start,
+  Retro_Timer_Stop,
+  Retro_Timer_Pause,
+  Retro_Timer_Unpause,
+  Retro_Timer_Ticks,
+  Retro_Timer_Started,
+  Retro_Timer_Paused,
+};
+
+
+
+#endif

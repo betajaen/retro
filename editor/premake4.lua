@@ -54,7 +54,7 @@ solution "Retro"
           flags           { "FatalWarnings", "NoExceptions", "NoRTTI", "WinMain" }
           defines         { "RETRO_USING_AS_LIBRARY" }
           links           { "LibRetro" }
-          includedirs     { }
+          includedirs     { "../" }
           libdirs         { }
           
           files           { "../retro*.h", "editor.c", "resources.rc" }

@@ -1719,6 +1719,7 @@ void Retro_Resources_LoadFont(const char* name, Retro_Font* outFont, Retro_Colou
   }
 
   outFont->widths[' '] = outFont->widths['e'];
+  height--;
 
   // Copy rest of image into the texture.
   for(i=0, j=width * 3;i < width * height * 4;i+=4, j+=3)
@@ -1749,7 +1750,7 @@ void Retro_Resources_LoadFont(const char* name, Retro_Font* outFont, Retro_Colou
   bitmap->imageData = imageData;
   
 
-  outFont->height = height - 1;
+  outFont->height = height;
   outFont->bitmap = bitmap->bitmapHandle;
 
 }
@@ -2290,6 +2291,8 @@ void RetroP_InitialiseRetro(Retro_Settings* settings)
 
   assert(RetroPRenderer);
 
+  printf("Init Renderer %p\n", RetroPRenderer);
+
   // Shared Audio Device
   SDL_AudioSpec want, got;
   memset(&want, 0, sizeof(want));
@@ -2633,10 +2636,33 @@ static RetroP_Context* RetroP_InitContext(Retro_Settings* settings, RetroP_Libra
 
 static void RetroP_ReleaseContext(RetroP_Context* context)
 {
-  SDL_CloseAudio();
-  free(RetroCtx->arena.begin);
-  free(RetroCtx);
-  RetroCtx = NULL;
+  for(U32 i=0;i < RETRO_MAX_CONTEXT;i++)
+  {
+    RetroP_Context* ctx = RetroContexts[i];
+    if (ctx == context)
+    {
+      RetroContexts[i] = NULL;
+      break;
+    }
+  }
+
+  free(context);
+}
+
+static RetroP_Context* RetroP_GetContext(int name)
+{
+  RetroP_Context* ctx;
+
+  for(U32 i=0;i < RETRO_MAX_CONTEXT;i++)
+  {
+    ctx = RetroContexts[i];
+    if (ctx == NULL)
+      continue;
+    if (ctx->id == name)
+      return ctx;
+  }
+
+  return NULL;
 }
 
 RETRO_API S32 Retro_Context_Id()
@@ -2699,12 +2725,6 @@ RETRO_API void  Retro_Context_Disable(int name)
   }
 }
 
-// Unload a context from memory (if a library also unload that library)
-RETRO_API void  Retro_Context_Unload(int name)
-{
-  // TODO:
-
-}
 
 RetroP_Library RetroP_LoadLibrary(const char* file, bool asCopy)
 {
@@ -2788,6 +2808,31 @@ int Retro_Context_LoadFromLibrary(const char* path, U8 flags)
   return newCtx->id;  // @TODO Return ContextID
 }
 
+void RetroP_UnloadLibrary(RetroP_Library* library)
+{
+#if defined(RETRO_WINDOWS)
+  if (library->winHandle != NULL)
+  {
+    FreeLibrary(library->winHandle);
+  }
+#endif
+}
+
+
+// Unload a context from memory (if a library also unload that library)
+RETRO_API bool  Retro_Context_Unload(int name)
+{
+  // TODO:
+  RetroP_Context* ctx = RetroP_GetContext(name);
+
+  if (ctx == NULL)
+    return false;
+  
+  RetroP_UnloadLibrary(&ctx->library);
+  RetroP_ReleaseContext(ctx);
+  
+  return true;
+}
 #undef RETRO_SDL_DRAW_PUSH_RGB
 #undef RETRO_SDL_DRAW_POP_RGB
 #undef RETRO_SDL_TO_RECT

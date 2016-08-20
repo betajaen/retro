@@ -1,13 +1,13 @@
 #define RETRO_WINDOW_CAPTION "Retro Editor"
 #define RETRO_SHORTHAND
+#define RETRO_NAMESPACES
 #define RETRO_NO_MAIN
 
-#include "../retro.h"
-#include "../retro_ns.h"
-#include "../retro_sh.h"
+#include "retro.h"
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define FONT_WIDTH       7
 #define FONT_HEIGHT      13
@@ -23,6 +23,7 @@
 
 static Font FONT_UI;
 static S32  UI_LastWidth = 0, UI_LastHeight = 0, UI_LastRight = 0, UI_Last_Bottom = 0;
+static S32 GameContext = -1;
 
 void Editor_SetPalette()
 {
@@ -77,9 +78,19 @@ RETRO_USER_STEP_API void Step()
 
   if (input.released(1))
   {
-    if (Retro_Context_Count() == 1)
+    if (GameContext == -1)
     {
-      Retro_Context_LoadFromLibrary("LibGame", 0);
+      const char* name = "LibGame";
+      printf("Loading Game %s\n", name);
+      GameContext = Retro_Context_LoadFromLibrary(name, 0);
+      printf("Loaded Game %i\n", GameContext);
+    }
+    else
+    {
+      printf("Unloading Game %i\n", GameContext);
+      Retro_Context_Unload(GameContext);
+      GameContext = -1;
+      printf("Unloaded Game\n");
     }
   }
 

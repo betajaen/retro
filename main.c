@@ -1,13 +1,7 @@
 #define RETRO_DEFAULT_WINDOW_CAPTION "Retro Game"
 
-#if !defined(RETRO_USING_AS_LIBRARY)
-#include "retro.c"
-#else
+#define RETRO_NAMESPACES
 #include "retro.h"
-#endif
-
-#include "retro_ns.h"
-#include "retro_sh.h"
 
 static Retro_Font                 FONT_NEOSANS;
 static Retro_BitmapHandle         SPRITESHEET;
