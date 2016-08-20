@@ -55,18 +55,6 @@ bool Editor_Button(S32 x, S32 y, const char* str)
 }
 
 
-
-RETRO_USER_SETTINGS_API void Settings(Retro_Settings* settings)
-{
-  settings->windowWidth   = 1280;
-  settings->windowHeight  = 720;
-  settings->canvasWidth   = settings->windowWidth / 2;
-  settings->canvasHeight  = settings->windowHeight;
-  settings->canvasScaleX  = 1;
-  settings->canvasScaleY  = 1;
-  settings->canvasX       = 0;
-}
-
 RETRO_USER_INIT_API void Init()
 {
   Editor_SetPalette();
@@ -97,4 +85,21 @@ RETRO_USER_STEP_API void Step()
 
 
   Retro_Debug(&FONT_UI);
+}
+
+int main(int argc, char *argv[])
+{
+  Retro_Settings settings = Retro_Default_Settings;
+
+  settings.windowWidth   = 1280;
+  settings.windowHeight  = 720;
+  settings.canvasWidth   = settings.windowWidth / 2;
+  settings.canvasHeight  = settings.windowHeight;
+  settings.canvasScaleX  = 1;
+  settings.canvasScaleY  = 1;
+  settings.canvasX       = 0;
+
+  Retro_Context_LoadFromInternal(&settings, Init, Start, Step, 0);
+  Retro_Shutdown();
+  return 0;
 }

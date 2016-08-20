@@ -2265,7 +2265,8 @@ void RetroP_InitialiseRetro(Retro_Settings* settings)
   RetroPMinWaitTime = 10000000;
   memset(&RetroContexts, 0, sizeof(RetroP_Context*) * RETRO_MAX_CONTEXT);
 
-  SDL_Init(SDL_INIT_EVERYTHING);
+  int e = SDL_Init(SDL_INIT_EVERYTHING);
+  assert(e == 0);
 
   RetroPWindow = SDL_CreateWindow( 
     settings->caption,
