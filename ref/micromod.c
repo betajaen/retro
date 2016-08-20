@@ -109,7 +109,7 @@ static void update_frequency( struct channel *chan ) {
 	volume = chan->volume + chan->tremolo_add;
 	if( volume > 64 ) volume = 64;
 	if( volume < 0 ) volume = 0;
-	chan->ampl = volume * gain;
+	chan->ampl = (unsigned char) (volume * gain);
 }
 
 static void tone_portamento( struct channel *chan ) {
@@ -123,7 +123,7 @@ static void tone_portamento( struct channel *chan ) {
 		source -= chan->porta_speed;
 		if( source < dest ) source = dest;
 	}
-	chan->period = source;
+	chan->period = (unsigned short) (source);
 }
 
 static void volume_slide( struct channel *chan, long param ) {
@@ -131,7 +131,7 @@ static void volume_slide( struct channel *chan, long param ) {
 	volume = chan->volume + ( param >> 4 ) - ( param & 0xF );
 	if( volume < 0 ) volume = 0;
 	if( volume > 64 ) volume = 64;
-	chan->volume = volume;
+	chan->volume = (unsigned char) (volume);
 }
 
 static long waveform( long phase, long type ) {
@@ -156,23 +156,23 @@ static long waveform( long phase, long type ) {
 }
 
 static void vibrato( struct channel *chan ) {
-	chan->vibrato_add = waveform( chan->vibrato_phase, chan->vibrato_type ) * chan->vibrato_depth >> 7;
+	chan->vibrato_add = (char) waveform( chan->vibrato_phase, chan->vibrato_type ) * chan->vibrato_depth >> 7;
 }
 
 static void tremolo( struct channel *chan ) {
-	chan->tremolo_add = waveform( chan->tremolo_phase, chan->tremolo_type ) * chan->tremolo_depth >> 6;
+	chan->tremolo_add = (char) waveform( chan->tremolo_phase, chan->tremolo_type ) * chan->tremolo_depth >> 6;
 }
 
 static void trigger( struct channel *channel ) {
 	long period, ins;
 	ins = channel->note.instrument;
 	if( ins > 0 && ins < 32 ) {
-		channel->assigned = ins;
+		channel->assigned = (unsigned char) ins;
 		channel->sample_offset = 0;
 		channel->fine_tune = instruments[ ins ].fine_tune;
 		channel->volume = instruments[ ins ].volume;
 		if( instruments[ ins ].loop_length > 0 && channel->instrument > 0 )
-			channel->instrument = ins;
+			channel->instrument = (unsigned char) ins;
 	}
 	if( channel->note.effect == 0x09 ) {
 		channel->sample_offset = ( channel->note.param & 0xFF ) << 8;
@@ -181,7 +181,7 @@ static void trigger( struct channel *channel ) {
 	}
 	if( channel->note.key > 0 ) {
 		period = ( channel->note.key * fine_tuning[ channel->fine_tune & 0xF ] ) >> 11;
-		channel->porta_period = ( period >> 1 ) + ( period & 1 );
+		channel->porta_period = (unsigned short) ( ( period >> 1 ) + ( period & 1 ) );
 		if( channel->note.effect != 0x3 && channel->note.effect != 0x5 ) {
 			channel->instrument = channel->assigned;
 			channel->period = channel->porta_period;
@@ -203,24 +203,24 @@ static void channel_row( struct channel *chan ) {
 	}
 	switch( effect ) {
 		case 0x3: /* Tone Portamento.*/
-			if( param > 0 ) chan->porta_speed = param;
+			if( param > 0 ) chan->porta_speed = (unsigned char) param;
 			break;
 		case 0x4: /* Vibrato.*/
-			if( ( param & 0xF0 ) > 0 ) chan->vibrato_speed = param >> 4;
-			if( ( param & 0x0F ) > 0 ) chan->vibrato_depth = param & 0xF;
+			if( ( param & 0xF0 ) > 0 ) chan->vibrato_speed = (unsigned char) (param >> 4);
+			if( ( param & 0x0F ) > 0 ) chan->vibrato_depth = (unsigned char) (param & 0xF);
 			vibrato( chan );
 			break;
 		case 0x6: /* Vibrato + Volume Slide.*/
 			vibrato( chan );
 			break;
 		case 0x7: /* Tremolo.*/
-			if( ( param & 0xF0 ) > 0 ) chan->tremolo_speed = param >> 4;
-			if( ( param & 0x0F ) > 0 ) chan->tremolo_depth = param & 0xF;
+			if( ( param & 0xF0 ) > 0 ) chan->tremolo_speed = (unsigned char) (param >> 4);
+			if( ( param & 0x0F ) > 0 ) chan->tremolo_depth = (unsigned char) (param & 0xF);
 			tremolo( chan );
 			break;
 		case 0x8: /* Set Panning. Not for 4-channel ProTracker. */
 			if( num_channels != 4 ) {
-				chan->panning = ( param < 128 ) ? ( param << 1 ) : 255;
+				chan->panning = (unsigned char)  (  ( param < 128 ) ? ( param << 1 ) : 255 );
 			}
 			break;
 		case 0xB: /* Pattern Jump.*/
@@ -230,7 +230,7 @@ static void channel_row( struct channel *chan ) {
 			}
 			break;
 		case 0xC: /* Set Volume.*/
-			chan->volume = param > 64 ? 64 : param;
+			chan->volume = (unsigned char) ( param > 64 ? 64 : param );
 			break;
 		case 0xD: /* Pattern Break.*/
 			if( pl_count < 0 ) {
@@ -247,18 +247,18 @@ static void channel_row( struct channel *chan ) {
 			break;
 		case 0x11: /* Fine Portamento Up.*/
 			period = chan->period - param;
-			chan->period = period < 0 ? 0 : period;
+			chan->period = (unsigned short) ( period < 0 ? 0 : period );
 			break;
 		case 0x12: /* Fine Portamento Down.*/
 			period = chan->period + param;
-			chan->period = period > 65535 ? 65535 : period;
+			chan->period = (unsigned short) ( period > 65535 ? 65535 : period );
 			break;
 		case 0x14: /* Set Vibrato Waveform.*/
-			if( param < 8 ) chan->vibrato_type = param;
+			if( param < 8 ) chan->vibrato_type = (unsigned char) param;
 			break;
 		case 0x16: /* Pattern Loop.*/
 			if( param == 0 ) /* Set loop marker on this channel. */
-				chan->pl_row = row;
+				chan->pl_row = (unsigned char) row;
 			if( chan->pl_row < row ) { /* Marker valid. Begin looping. */
 				if( pl_count < 0 ) { /* Not already looping, begin. */
 					pl_count = param;
@@ -267,7 +267,7 @@ static void channel_row( struct channel *chan ) {
 				if( pl_channel == chan->id ) { /* Next Loop.*/
 					if( pl_count == 0 ) { /* Loop finished. */
 						/* Invalidate current marker. */
-						chan->pl_row = row + 1;
+						chan->pl_row = (unsigned char) (row + 1);
 					} else { /* Loop and cancel any breaks on this row. */
 						next_row = chan->pl_row;
 						break_pattern = -1;
@@ -277,15 +277,15 @@ static void channel_row( struct channel *chan ) {
 			}
 			break;
 		case 0x17: /* Set Tremolo Waveform.*/
-			if( param < 8 ) chan->tremolo_type = param;
+			if( param < 8 ) chan->tremolo_type = (unsigned char) param;
 			break;
 		case 0x1A: /* Fine Volume Up.*/
 			volume = chan->volume + param;
-			chan->volume = volume > 64 ? 64 : volume;
+			chan->volume = (unsigned char) ( volume > 64 ? 64 : volume );
 			break;
 		case 0x1B: /* Fine Volume Down.*/
 			volume = chan->volume - param;
-			chan->volume = volume < 0 ? 0 : volume;
+			chan->volume = (unsigned char) ( volume < 0 ? 0 : volume );
 			break;
 		case 0x1C: /* Note Cut.*/
 			if( param <= 0 ) chan->volume = 0;
@@ -305,11 +305,11 @@ static void channel_tick( struct channel *chan ) {
 	switch( effect ) {
 		case 0x1: /* Portamento Up.*/
 			period = chan->period - param;
-			chan->period = period < 0 ? 0 : period;
+			chan->period = (unsigned short) (period < 0 ? 0 : period);
 			break;
 		case 0x2: /* Portamento Down.*/
 			period = chan->period + param;
-			chan->period = period > 65535 ? 65535 : period;
+			chan->period = (unsigned short) (period > 65535 ? 65535 : period);
 			break;
 		case 0x3: /* Tone Portamento.*/
 			tone_portamento( chan );
@@ -337,8 +337,8 @@ static void channel_tick( struct channel *chan ) {
 		case 0xE: /* Arpeggio.*/
 			if( chan->fx_count > 2 ) chan->fx_count = 0;
 			if( chan->fx_count == 0 ) chan->arpeggio_add = 0;
-			if( chan->fx_count == 1 ) chan->arpeggio_add = param >> 4;
-			if( chan->fx_count == 2 ) chan->arpeggio_add = param & 0xF;
+			if( chan->fx_count == 1 ) chan->arpeggio_add = (char) ( param >> 4 );
+			if( chan->fx_count == 2 ) chan->arpeggio_add = (char) ( param & 0xF );
 			break;
 		case 0x19: /* Retrig.*/
 			if( chan->fx_count >= param ) {
@@ -389,8 +389,8 @@ static long sequence_row() {
 			param &= 0xF;
 		}
 		if( effect == 0 && param > 0 ) effect = 0xE;
-		note->effect = effect;
-		note->param = param;
+		note->effect = (unsigned char) effect;
+		note->param = (unsigned char) param;
 		channel_row( &channels[ chan_idx ] );
 	}
 	return song_end;
@@ -447,8 +447,8 @@ static void resample( struct channel *chan, short *buf, long offset, long count 
 		while( sidx < epos ) {
 			/* Most of the cpu time is spent in here. */
 			sample = sdat[ sidx >> FP_SHIFT ];
-			buf[ buf_idx++ ] += sample * lamp >> 8;
-			buf[ buf_idx++ ] += sample * ramp >> 8;
+			buf[ buf_idx++ ] += (short) ( sample * lamp >> 8 );
+			buf[ buf_idx++ ] += (short) ( sample * ramp >> 8 );
 			sidx += step;
 		}
 	}
@@ -499,7 +499,7 @@ long micromod_initialise( signed char *data, long sampling_rate ) {
 		fine_tune = module_data[ inst_idx * 30 + 14 ] & 0xF;
 		inst->fine_tune = ( fine_tune & 0x7 ) - ( fine_tune & 0x8 ) + 8;
 		volume = module_data[ inst_idx * 30 + 15 ] & 0x7F;
-		inst->volume = volume > 64 ? 64 : volume;
+		inst->volume = (unsigned char) ( volume > 64 ? 64 : volume );
 		loop_start = unsigned_short_big_endian( module_data, inst_idx * 30 + 16 ) * 2;
 		loop_length = unsigned_short_big_endian( module_data, inst_idx * 30 + 18 ) * 2;
 		if( loop_start + loop_length > sample_length )
@@ -540,7 +540,7 @@ void micromod_get_string( long instrument, char *string ) {
 	for( index = 0; index < length; index++ ) {
 		character = module_data[ offset + index ];
 		if( character < 32 || character > 126 ) character = ' ';
-		string[ index ] = character;
+		string[ index ] = (char) character;
 	}
 	string[ length ] = 0;
 }
@@ -581,7 +581,7 @@ void micromod_set_position( long pos ) {
 	random_seed = 0xABCDEF;
 	for( chan_idx = 0; chan_idx < num_channels; chan_idx++ ) {
 		chan = &channels[ chan_idx ];
-		chan->id = chan_idx;
+		chan->id = (unsigned char) chan_idx;
 		chan->instrument = chan->assigned = 0;
 		chan->volume = 0;
 		switch( chan_idx & 0x3 ) {
