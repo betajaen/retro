@@ -1797,7 +1797,7 @@ void  Retro_Resources_LoadFontFixed(const char* name, Retro_Font* outFont, U8 w,
   outFont->widths[' '] = w;
 
   // Copy rest of image into the texture.
-  for(i=0, j=width * 3;i < width * height * 4;i+=4, j+=3)
+  for(i=0, j=width * 3;i < width * (height - 2) * 4;i+=4, j+=3)
   {
     Retro_Colour col = Retro_Colour_ReadRGB(&imageData[j]);
 
@@ -1821,7 +1821,7 @@ void  Retro_Resources_LoadFontFixed(const char* name, Retro_Font* outFont, U8 w,
 
   bitmap->texture = texture;
   bitmap->w = width;
-  bitmap->h = height;
+  bitmap->h = height - 1;
   bitmap->imageData = imageData;
 
   outFont->height = height - 1;
